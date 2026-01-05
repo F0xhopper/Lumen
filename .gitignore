@@ -1,0 +1,90 @@
+# ============================================
+# Backend (Python/Flask)
+# ============================================
+backend/__pycache__/
+backend/*.py[cod]
+backend/*.pyc
+backend/venv/
+backend/.venv/
+backend/env/
+backend/*.egg-info/
+backend/dist/
+backend/build/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/*.log
+backend/.mypy_cache/
+
+# ============================================
+# Frontend (Next.js/TypeScript)
+# ============================================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel
+frontend/next-env.d.ts
+frontend/.npm
+frontend/.cache/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/.eslintcache
+
+# ============================================
+# Environment & Config
+# ============================================
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# ============================================
+# IDE & Editor
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# ============================================
+# Project Specific
+# ============================================
+# Vector databases
+chroma_db/
+pinecone_data/
+weaviate_data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Document processing
+uploads/
+documents/
+processed_docs/
+temp_docs/
+
+# Models & embeddings
+models/
+embeddings/
+*.pkl
+*.pickle
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+.tmp/
