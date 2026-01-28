@@ -41,10 +41,8 @@ from llama_index.vector_stores.pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -89,17 +87,14 @@ class AquinasRAGSystem:
         """
         self.llama_cloud_api_key = llama_cloud_api_key or os.getenv("LLAMA_CLOUD_API_KEY")
         
-        # Rate limiting configuration
         self.embed_batch_size = int(os.getenv("EMBED_BATCH_SIZE", "10"))
-        self.embed_delay = float(os.getenv("EMBED_DELAY", "0.5"))  # seconds between batches
+        self.embed_delay = float(os.getenv("EMBED_DELAY", "0.5"))
         
-        # Initialize components
         self._setup_llm()
         self._setup_embeddings()
         self._setup_vector_store()
         self._setup_advanced_chunking()
         
-        # Initialize index and query engine
         self.index = None
         self.query_engine = None
         
@@ -115,7 +110,6 @@ class AquinasRAGSystem:
             max_tokens=4000
         )
         
-        # Set global LLM
         Settings.llm = self.llm
         
     def _setup_embeddings(self):
@@ -127,11 +121,10 @@ class AquinasRAGSystem:
         self.embeddings = OpenAIEmbedding(
             model="text-embedding-3-large",
             embed_batch_size=self.embed_batch_size,
-            timeout=60.0,  # Increased timeout for slower requests
-            max_retries=3  # Add retry logic
+            timeout=60.0,
+            max_retries=3
         )
         
-        # Set global embeddings
         Settings.embed_model = self.embeddings
         
     def _setup_vector_store(self):
@@ -140,38 +133,31 @@ class AquinasRAGSystem:
         if not api_key:
             raise ValueError("PINECONE_API_KEY required")
         
-        # Initialize Pinecone client
         self.pc = Pinecone(api_key=api_key)
         
-        # Create or get the index
         index_name = os.getenv("PINECONE_INDEX_NAME", "aquinas-works-testing-page-number")
         namespace = os.getenv("PINECONE_NAMESPACE", "").strip() or None
-        # Store for later checks
         self.pinecone_index_name = index_name
         self.pinecone_namespace = namespace
         
-        # Check if index exists, create if not
         if index_name not in self.pc.list_indexes().names():
             logger.info(f"Creating Pinecone index: {index_name}")
             self.pc.create_index(
                 name=index_name,
-                dimension=3072,  # text-embedding-3-large dimensions
+                dimension=3072,
                 metric="cosine",
                 spec=ServerlessSpec(cloud="aws", region="us-east-1"),
             )
         else:
             logger.info(f"Using existing Pinecone index: {index_name}")
         
-        # Get the index object
         pinecone_index = self.pc.Index(index_name)
         
-        # Initialize PineconeVectorStore with the index object
         self.vector_store_obj = PineconeVectorStore(
             pinecone_index=pinecone_index,
             namespace=namespace
         )
         
-        # Always create an index wrapper and query engine so the API is ready
         try:
             self.index = VectorStoreIndex.from_vector_store(self.vector_store_obj)
             self.create_query_engine()
@@ -183,7 +169,6 @@ class AquinasRAGSystem:
         """Set up semantic chunking for Aquinas texts."""
         self.aquinas_chunker = AquinasChunker(self.embeddings)
         
-        # Use semantic splitter for all documents
         self.semantic_parser = self.aquinas_chunker.get_semantic_splitter()
         
     def _rate_limit_delay(self):
@@ -195,13 +180,10 @@ class AquinasRAGSystem:
         """Return approximate count of existing vectors in the Pinecone index/namespace."""
         try:
             index = self.pc.Index(self.pinecone_index_name)
-            # Stats shape differs across client versions; handle robustly
-            stats = index.describe_index_stats()  # may be dict-like or object
-            # Normalize to dict
+            stats = index.describe_index_stats()
             if hasattr(stats, "to_dict"):
                 stats = stats.to_dict()
             elif not isinstance(stats, dict):
-                # Try attribute access fallback
                 maybe_total = getattr(stats, "total_vector_count", None)
                 maybe_namespaces = getattr(stats, "namespaces", None)
                 if maybe_total is not None:
@@ -211,7 +193,6 @@ class AquinasRAGSystem:
                     ns_total = ns_stats.get("vector_count") or ns_stats.get("total_vector_count") or 0
                     return int(ns_total)
                 return 0
-            # Now stats is a dict
             if self.pinecone_namespace:
                 ns = stats.get("namespaces", {}).get(self.pinecone_namespace)
                 if isinstance(ns, dict):
@@ -231,9 +212,7 @@ class AquinasRAGSystem:
                 + (f" namespace '{self.pinecone_namespace}'" if self.pinecone_namespace else "")
                 + "; loading index wrapper..."
             )
-            # Create an index wrapper backed by the existing vector store
             self.index = VectorStoreIndex.from_vector_store(self.vector_store_obj)
-            # Prepare query engine immediately
             self.create_query_engine()
             logger.info("Loaded existing Pinecone vectors; query engine is ready")
 
@@ -266,7 +245,6 @@ class AquinasRAGSystem:
             
         logger.info(f"Ingesting documents from: {documents_path}")
         
-        # Read documents
         if documents_path.is_file():
             file_paths = [documents_path]
         else:
@@ -277,14 +255,11 @@ class AquinasRAGSystem:
         
         for file_path in file_paths:
             try:
-                # Add rate limiting delay between file processing
                 self._rate_limit_delay()
                 
-                # Parse document using SimpleDirectoryReader
                 reader = SimpleDirectoryReader(input_files=[str(file_path)])
                 parsed_docs = reader.load_data()
                 
-                # Add basic metadata
                 for i,doc in enumerate(parsed_docs):
                     doc.metadata.update({
                         "file_path": str(file_path),
@@ -309,14 +284,11 @@ class AquinasRAGSystem:
         """Build the vector index from documents using semantic chunking."""
         logger.info("Building vector index with semantic chunking...")
         
-        # Create storage context
         storage_context = StorageContext.from_defaults(vector_store=self.vector_store_obj)
         
-        # Use semantic splitter for all documents
         node_parser = self.semantic_parser
         logger.info("Using semantic chunking for all documents")
         
-        # Build index with semantic chunking
         self.index = VectorStoreIndex.from_documents(
             documents,
             show_progress=True,
@@ -337,22 +309,19 @@ class AquinasRAGSystem:
         
         logger.info(f"Adding {len(documents)} documents to existing index...")
         
-        # Use semantic splitter for all documents
         node_parser = self.semantic_parser
         logger.info("Using semantic chunking for new documents")
         
-        # Process documents with semantic chunking
         nodes = node_parser.get_nodes_from_documents(documents)
         self.index.insert_nodes(nodes)
         logger.info(f"Successfully added {len(documents)} documents to existing index")
         
-        # Recreate query engine to include new documents
         self.create_query_engine()
         logger.info("Query engine updated with new documents")
         
     def create_query_engine(
         self,
-        similarity_top_k: int = 15,  # Increased to allow for better filtering
+        similarity_top_k: int = 15,
         response_mode: str = "compact",
         use_metadata_filter: bool = True,
         use_llm_rerank: bool = True
@@ -361,29 +330,23 @@ class AquinasRAGSystem:
         if not self.index:
             raise ValueError("Index not built. Call build_index() first.")
             
-        # Create retriever
         retriever = VectorIndexRetriever(
             index=self.index,
             similarity_top_k=similarity_top_k
         )
         
-        # Create postprocessors optimized for Aquinas philosophical texts
         postprocessors = []
         
-        # 1. Similarity filtering - remove completely irrelevant chunks
         similarity_postprocessor = SimilarityPostprocessor(similarity_cutoff=0.3)
         postprocessors.append(similarity_postprocessor)
         
-        # 2. Long context reordering - important for dense philosophical texts
         long_context_reorder = LongContextReorder()
         postprocessors.append(long_context_reorder)
         
-        # 3. LLM reranking - understands philosophical context and nuance
         if use_llm_rerank:
             llm_rerank = LLMRerank(top_n=5)
             postprocessors.append(llm_rerank)
         
-        # Create query engine with basic response
         self.query_engine = RetrieverQueryEngine.from_args(
             retriever=retriever,
             node_postprocessors=postprocessors,
@@ -406,20 +369,16 @@ class AquinasRAGSystem:
         if not self.index:
             raise ValueError("Index not built. Call build_index() first.")
             
-        # Create retriever
         retriever = VectorIndexRetriever(
             index=self.index,
             similarity_top_k=similarity_top_k
         )
         
-        # Create postprocessors for faster processing
         postprocessors = []
         
-        # 1. Similarity filtering
         similarity_postprocessor = SimilarityPostprocessor(similarity_cutoff=0.3)
         postprocessors.append(similarity_postprocessor)
         
-        # 2. Sentence transformer rerank (faster alternative to LLM rerank)
         if use_sentence_transformer_rerank:
             from llama_index.core.postprocessor import SentenceTransformerRerank
             sentence_rerank = SentenceTransformerRerank(
@@ -428,7 +387,6 @@ class AquinasRAGSystem:
             )
             postprocessors.append(sentence_rerank)
         
-        # Create query engine with basic response
         self.query_engine = RetrieverQueryEngine.from_args(
             retriever=retriever,
             node_postprocessors=postprocessors,
@@ -457,81 +415,23 @@ class AquinasRAGSystem:
         if not self.query_engine:
             raise ValueError("Query engine not created. Call create_query_engine() first.")
         
-        # Retrieve passages if requested
         retrieved_passages = None
         if retrieve_passages:
             retrieved_passages = self._retrieve_relevant_passages(question)
             
-        # Create Aquinas-specific prompt with retrieved passages
         aquinas_prompt = self._create_aquinas_prompt(question, retrieved_passages)
         
-        # Query the system
         response = self.query_engine.query(aquinas_prompt)
         
-        # Debug logging
         logger.info(f"Query: {question}")
         logger.info(f"Response type: {type(response)}")
         logger.info(f"Response: {response}")
         
-        # Handle empty response
         if not response or str(response).strip() == "":
             return "I apologize, but I couldn't find relevant information in the uploaded documents to answer your question. Please try rephrasing your question or upload more relevant documents."
         
         return str(response)
     
-    def _get_source_priority(self, metadata: Dict[str, Any]) -> int:
-        """
-        Determine the priority level of a source based on its metadata.
-        
-        Priority levels (lower number = higher priority):
-        1 - Aquinas's primary works (Summa Theologiae, Summa Contra Gentiles, etc.)
-        2 - Other Aquinas works (Commentaries, Disputed Questions, etc.)
-        3 - Secondary sources (commentaries, modern interpretations)
-        4 - Unknown or unclear sources
-        
-        Args:
-            metadata: Document metadata
-            
-        Returns:
-            Priority level (1-4)
-        """
-        file_name = metadata.get('file_name', '').lower()
-        source = metadata.get('source', '').lower()
-        
-        # Primary Aquinas works - highest priority
-        primary_works = [
-            'summa theologiae', 'summa contra gentiles', 'summa theologica',
-            'st', 'scg', 'de veritate', 'de potentia', 'de malo',
-            'quodlibetal questions', 'quodlibet', 'disputed questions'
-        ]
-        
-        for work in primary_works:
-            if work in file_name or work in source:
-                return 1
-        
-        # Other Aquinas works - high priority
-        aquinas_works = [
-            'aquinas', 'thomas', 'thomistic', 'commentary', 'commentaries',
-            'sentences', 'lombard', 'aristotle', 'augustine'
-        ]
-        
-        for work in aquinas_works:
-            if work in file_name or work in source:
-                return 2
-        
-        # Secondary sources - lower priority
-        secondary_indicators = [
-            'commentary', 'interpretation', 'analysis', 'study', 'introduction',
-            'guide', 'handbook', 'modern', 'contemporary', 'scholarly'
-        ]
-        
-        for indicator in secondary_indicators:
-            if indicator in file_name or indicator in source:
-                return 3
-        
-        # Unknown sources - lowest priority
-        return 4
-
     def _retrieve_relevant_passages(self, question: str, top_k: int = 5) -> List[NodeWithScore]:
         """
         Retrieve relevant passages from the vector store for the given question.
@@ -548,35 +448,25 @@ class AquinasRAGSystem:
             return []
         
         try:
-            # Retrieve more passages initially to allow for prioritization
             retriever = VectorIndexRetriever(
                 index=self.index,
-                similarity_top_k=top_k * 2  # Get more to allow for filtering and ranking
+                similarity_top_k=top_k * 2
             )
             
-            # Retrieve relevant nodes
             nodes = retriever.retrieve(question)
             
-            # Apply similarity filtering
             similarity_postprocessor = SimilarityPostprocessor(similarity_cutoff=0.3)
             filtered_nodes = similarity_postprocessor.postprocess_nodes(nodes)
             
-            # Sort by source priority, then by similarity score
             def sort_key(node_with_score):
-                priority = self._get_source_priority(node_with_score.node.metadata)
                 score = getattr(node_with_score, 'score', 0.0)
-                # Lower priority number = higher priority, so we negate it
-                # Higher similarity score = better, so we keep it positive
-                return (-priority, score)
+                return score
             
-            # Sort by priority and score
             sorted_nodes = sorted(filtered_nodes, key=sort_key, reverse=True)
             
-            # Take only the top_k results
             prioritized_nodes = sorted_nodes[:top_k]
             
             logger.info(f"Retrieved {len(prioritized_nodes)} relevant passages for question: {question}")
-            logger.info(f"Source priorities: {[self._get_source_priority(node.node.metadata) for node in prioritized_nodes]}")
             
             return prioritized_nodes
             
@@ -630,23 +520,19 @@ class AquinasRAGSystem:
     def _create_aquinas_prompt(self, question: str, retrieved_passages: list = None) -> str:
         """Create a sophisticated prompt for Aquinas queries with RAG integration."""
         
-        # Build context from retrieved passages if available
         context_section = ""
         reference_list = ""
         if retrieved_passages:
             context_section = "\n\nRetrieved Context from Aquinas's Works:\n"
             reference_list = "\n\nReferences:\n"
             
-            # Create a list of all citation information for the AI to process
             citation_data = []
             
             for passage in retrieved_passages:
-                # Handle NodeWithScore objects
                 if hasattr(passage, 'node'):
                     node = passage.node
                     text_content = node.text
                     
-                    # Extract source information from metadata
                     author = node.metadata.get('author', '')
                     title = node.metadata.get('title', '')
                     link = node.metadata.get('link', '')
@@ -655,34 +541,25 @@ class AquinasRAGSystem:
                     page_label = node.metadata.get('page_label', '')
                     leaf_number = node.metadata.get('leaf_number', '')
                     
-                    # Create proper citation format with enhanced metadata
                     citation_parts = []
                     
-                    # Add author if available
                     if author:
                         citation_parts.append(author)
                     
-                    # Add title if available
                     if title:
                         citation_parts.append(f'"{title}"')
                     elif file_name != 'Unknown':
                         citation_parts.append(f'({file_name})')
                     
-                    # Add page information if available
                     if page_label:
                         citation_parts.append(f'p. {page_label}')
                     
-                    # Add link if available, incorporating leaf number if present
                     if link:
-                        # Check if this is an archive.org URL and if we have a leaf number
                         if 'archive.org' in link and leaf_number:
-                            # Use leaf_number directly for the URL
                             if 'archive.org/details/' in link:
-                                # Insert leaf number before the mode parameter
                                 if '/mode/' in link:
                                     link_with_page = link.replace('/mode/', f'/page/n{leaf_number}/mode/')
                                 else:
-                                    # Add leaf number at the end if no mode parameter
                                     link_with_page = f"{link}/page/n{leaf_number}/mode/2up"
                                 citation_parts.append(f'[Link: {link_with_page}]')
                             else:
@@ -690,7 +567,6 @@ class AquinasRAGSystem:
                         else:
                             citation_parts.append(f'[Link: {link}]')
                     
-                    # Create final citation text
                     if citation_parts:
                         citation_text = ', '.join(citation_parts)
                     else:
@@ -706,7 +582,6 @@ class AquinasRAGSystem:
                         'file_name': file_name
                     })
                 else:
-                    # Fallback for other types
                     text_content = str(passage)
                     citation_text = 'Passage'
                     
@@ -718,7 +593,6 @@ class AquinasRAGSystem:
                         'file_name': 'Unknown'
                     })
             
-            # Add all passages to context without manual numbering
             for citation_info in citation_data:
                 context_section += f"{citation_info['citation']}:\n> {citation_info['text'].replace(chr(10), chr(10) + '> ')}\n\n"
         
@@ -778,8 +652,6 @@ Provide a comprehensive response that demonstrates both textual fidelity to Aqui
         if not self.index:
             return {}
             
-        # This would require accessing the index's document store
-        # For now, return a placeholder
         return {
             "total_documents": "N/A",
             "vector_store": "Pinecone",

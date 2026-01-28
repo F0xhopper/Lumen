@@ -23,14 +23,11 @@ from pydantic import BaseModel, Field
 import uvicorn
 from dotenv import load_dotenv
 
-# Import the Aquinas RAG system
 from aquinas_rag import AquinasRAGSystem, AquinasDocument
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global RAG system instance
 rag_system: Optional[AquinasRAGSystem] = None
 
 @asynccontextmanager
@@ -38,13 +35,11 @@ async def lifespan(app: FastAPI):
     """Manage application lifespan - initialize and cleanup resources."""
     global rag_system
     
-    # Initialize the RAG system on startup
     try:
         logger.info("Initializing Aquinas RAG system with Pinecone + OpenAI + LlamaCloud...")
         rag_system = AquinasRAGSystem(
             llama_cloud_api_key=os.getenv("LLAMA_CLOUD_API_KEY")
         )
-        # Ensure the index wrapper and query engine are ready on startup
         try:
             rag_system.ensure_ready_for_queries()
             logger.info("RAG system query engine ready on startup")
@@ -57,10 +52,8 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Cleanup on shutdown
     logger.info("Shutting down Aquinas RAG system...")
 
-# Create FastAPI application
 app = FastAPI(
     title="Aquinas RAG API",
     description="Sophisticated RAG system for St. Thomas Aquinas works using Pinecone, OpenAI, and LlamaCloud",
@@ -68,16 +61,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic models for request/response
 class QueryRequest(BaseModel):
     """Request model for querying the RAG system."""
     query: str = Field(..., description="The question to ask about Aquinas", min_length=1)
@@ -107,14 +98,12 @@ class StatusResponse(BaseModel):
 
 async def process_uploaded_file(file: UploadFile, author: Optional[str] = None, title: Optional[str] = None, link: Optional[str] = None) -> List[Any]:
     """Process an uploaded file and return documents with custom metadata."""
-    # Create temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
         content = await file.read()
         temp_file.write(content)
         temp_file_path = temp_file.name
     
     try:
-        # Prepare custom metadata
         custom_metadata = {}
         if author:
             custom_metadata["author"] = author
@@ -123,17 +112,13 @@ async def process_uploaded_file(file: UploadFile, author: Optional[str] = None, 
         if link:
             custom_metadata["link"] = link
         
-        # Process the document with custom metadata
         documents = rag_system.ingest_documents(
             documents_path=temp_file_path,
             custom_metadata=custom_metadata if custom_metadata else None
         )
         return documents
     finally:
-        # Clean up temporary file
         os.unlink(temp_file_path)
-
-# API Endpoints
 
 @app.get("/", response_model=Dict[str, str])
 async def root():
@@ -176,7 +161,6 @@ async def query_aquinas(request: QueryRequest):
     
     try:
         
-        # Query the RAG system
         answer = rag_system.query(
             question=request.query,
             context_length=request.context_length
@@ -212,36 +196,29 @@ async def upload_document(
         raise HTTPException(status_code=503, detail="RAG system not initialized")
     
     try:
-        # Validate file type
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
     except HTTPException:
         raise
     
     try:
-        # Process the uploaded file with metadata
         documents = await process_uploaded_file(file, author, title, link)
         
         if not documents:
             raise HTTPException(status_code=400, detail="No documents could be processed from the file")
         
-        # Build or update the index
         if rag_system.index is None:
-            # First document - build new index
             logger.info("Building new index with first document...")
             rag_system.build_index(documents)
             rag_system.create_query_engine()
             index_status = "New index created"
         else:
-            # Additional documents - add to existing index
             logger.info("Adding document to existing index...")
             rag_system.add_documents_to_index(documents)
             index_status = "Document added to existing index"
         
-        # Get total document count (approximate)
         total_documents = len(documents) if rag_system.index is None else len(documents) + 1
         
-        # Prepare metadata information for response
         metadata_added = {}
         if author:
             metadata_added["author"] = author
@@ -306,7 +283,6 @@ async def get_system_status():
             status_message="RAG system not initialized"
         )
     
-    # Try to ensure readiness if not already ready
     if rag_system.index is None or rag_system.query_engine is None:
         try:
             rag_system.ensure_ready_for_queries()
@@ -329,7 +305,6 @@ async def get_system_status():
         status_message=status_message
     )
 
-# Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     return JSONResponse(
@@ -363,7 +338,6 @@ def check_environment():
     """Check if required environment variables are set."""
     required_vars = []
     
-    # Check for at least one LLM provider
     llm_provider = os.getenv("LLM_PROVIDER", "openai")
     
     if llm_provider == "openai":
@@ -373,10 +347,8 @@ def check_environment():
         if not os.getenv("ANTHROPIC_API_KEY"):
             required_vars.append("ANTHROPIC_API_KEY")
     elif llm_provider == "ollama":
-        # Ollama doesn't require API key, but we should check if it's running
         pass
     
-    # Check embedding provider (currently only OpenAI supported)
     if not os.getenv("OPENAI_API_KEY"):
         required_vars.append("OPENAI_API_KEY (for embeddings)")
     
@@ -426,18 +398,14 @@ def main():
     
     args = parser.parse_args()
     
-    # Load environment variables
     load_dotenv()
     
-    # Set up logging
     setup_logging(args.log_level)
     logger = logging.getLogger(__name__)
     
-    # Check environment
     if not check_environment():
         sys.exit(1)
     
-    # Print startup information
     print("🏛️  Aquinas RAG API")
     print("=" * 50)
     print(f"Host: {args.host}")
@@ -447,7 +415,6 @@ def main():
     print(f"Workers: {args.workers}")
     print("=" * 50)
     
-    # Configuration summary
     llm_provider = os.getenv("LLM_PROVIDER", "openai")
     vector_store = os.getenv("VECTOR_STORE", "chroma")
     embedding_provider = os.getenv("EMBEDDING_PROVIDER", "openai")
@@ -457,7 +424,6 @@ def main():
     print(f"Vector Store: {vector_store}")
     print("=" * 50)
     
-    # Start the server
     try:
         logger.info("Starting Aquinas RAG API server...")
         uvicorn.run(
