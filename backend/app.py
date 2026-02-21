@@ -427,7 +427,7 @@ def main():
     try:
         logger.info("Starting Aquinas RAG API server...")
         uvicorn.run(
-            "app:app",
+            "app.main:app",
             host=args.host,
             port=args.port,
             reload=args.reload,

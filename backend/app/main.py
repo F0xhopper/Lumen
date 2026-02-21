@@ -17,7 +17,7 @@ from app.core.logging import setup_logging, get_logger
 from app.core.dependencies import get_rag_service
 from app.api.middleware.cors import add_cors_middleware
 from app.api.middleware.error_handlers import add_error_handlers
-from app.api.routes import root, query, upload, passages, status
+from app.api.routes import root, query, upload, status
 
 setup_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
@@ -62,7 +62,6 @@ def create_app() -> FastAPI:
     app.include_router(root.router)
     app.include_router(query.router)
     app.include_router(upload.router)
-    app.include_router(passages.router)
     app.include_router(status.router)
     
     return app
