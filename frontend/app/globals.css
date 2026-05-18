@@ -4,36 +4,22 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --radius: 0.5rem;
-  }
-
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 9%;
+    --secondary-foreground: 0 0% 80%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 50%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 93%;
+    --border: 0 0% 15%;
+    --input: 0 0% 9%;
+    --ring: 0 0% 60%;
+    --radius: 0.25rem;
   }
 }
 
@@ -46,9 +32,8 @@
   }
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -56,57 +41,56 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
+  background: hsl(var(--border));
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.4);
 }
 
-/* Markdown styles */
 .markdown {
   @apply text-sm leading-7;
 }
 
 .markdown h1 {
-  @apply text-2xl font-bold mb-4 mt-6 text-foreground;
+  @apply text-xl font-semibold mb-4 mt-6 text-foreground tracking-tight;
 }
 
 .markdown h2 {
-  @apply text-xl font-bold mb-3 mt-5 text-foreground;
+  @apply text-base font-semibold mb-3 mt-5 text-foreground tracking-tight;
 }
 
 .markdown h3 {
-  @apply text-lg font-bold mb-2 mt-4 text-foreground;
+  @apply text-sm font-semibold mb-2 mt-4 text-foreground;
 }
 
 .markdown p {
-  @apply mb-4 text-foreground;
+  @apply mb-4 text-foreground/90;
 }
 
 .markdown ul {
-  @apply list-disc list-inside mb-4;
+  @apply list-disc list-inside mb-4 space-y-1;
 }
 
 .markdown ol {
-  @apply list-decimal list-inside mb-4;
+  @apply list-decimal list-inside mb-4 space-y-1;
 }
 
 .markdown li {
-  @apply mb-1 text-foreground;
+  @apply mb-1 text-foreground/90;
 }
 
 .markdown blockquote {
-  @apply border-l-4 border-muted pl-4 italic my-4 text-muted-foreground;
+  @apply border-l-2 border-muted-foreground/40 pl-4 italic my-4 text-muted-foreground;
 }
 
 .markdown code {
-  @apply bg-muted px-1 py-0.5 rounded text-sm font-mono text-foreground;
+  @apply bg-muted px-1 py-0.5 rounded text-xs font-mono text-foreground/80;
 }
 
 .markdown pre {
-  @apply bg-muted p-4 rounded-lg overflow-x-auto my-4;
+  @apply bg-muted p-4 rounded overflow-x-auto my-4;
 }
 
 .markdown pre code {
@@ -114,11 +98,11 @@
 }
 
 .markdown a {
-  @apply text-blue-400 hover:text-blue-300 underline;
+  @apply text-foreground/70 hover:text-foreground underline underline-offset-2 decoration-foreground/30;
 }
 
 .markdown table {
-  @apply w-full border-collapse border border-border my-4;
+  @apply w-full border-collapse my-4 text-sm;
 }
 
 .markdown th,
@@ -127,9 +111,13 @@
 }
 
 .markdown th {
-  @apply bg-muted font-semibold text-foreground;
+  @apply bg-muted font-medium text-foreground/80;
 }
 
 .markdown td {
-  @apply text-foreground;
+  @apply text-foreground/80;
+}
+
+.markdown sup {
+  @apply text-xs text-muted-foreground;
 }

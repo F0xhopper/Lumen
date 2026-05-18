@@ -1,15 +1,40 @@
-"""FastAPI dependency injection setup."""
+"""Shared client instances — created once at startup."""
 
-from functools import lru_cache
-from app.services.rag_service import RAGService
+import asyncpg
+from openai import AsyncOpenAI
+from pinecone import Pinecone
 
-rag_service_instance = None
+from app.core.config import settings
+
+_db_pool: asyncpg.Pool | None = None
+_openai: AsyncOpenAI | None = None
+_pinecone_index = None
 
 
-@lru_cache()
-def get_rag_service() -> RAGService:
-    """Get or create the RAG service instance."""
-    global rag_service_instance
-    if rag_service_instance is None:
-        rag_service_instance = RAGService()
-    return rag_service_instance
+async def init_db():
+    global _db_pool
+    _db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+
+
+async def close_db():
+    if _db_pool:
+        await _db_pool.close()
+
+
+def get_db_pool() -> asyncpg.Pool:
+    return _db_pool
+
+
+def get_openai() -> AsyncOpenAI:
+    global _openai
+    if _openai is None:
+        _openai = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    return _openai
+
+
+def get_pinecone_index():
+    global _pinecone_index
+    if _pinecone_index is None:
+        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        _pinecone_index = pc.Index(settings.PINECONE_INDEX_NAME)
+    return _pinecone_index

@@ -1,45 +1,20 @@
-"""Query endpoints for the RAG system."""
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter, HTTPException, Depends
-
-from app.models.requests import QueryRequest
-from app.models.responses import QueryResponse
-from app.core.dependencies import get_rag_service
+from app.models.schemas import QueryRequest, QueryResponse
+from app.services.retrieval import hybrid_search
+from app.services.answer import generate_answer
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-
 router = APIRouter()
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query_aquinas(
-    request: QueryRequest,
-    rag_service = Depends(get_rag_service)
-):
-    """
-    Query the Aquinas RAG system with a question.
-    
-    This endpoint allows you to ask questions about St. Thomas Aquinas's works
-    and get comprehensive answers based on the indexed documents.
-    """
-    if not rag_service.query_engine:
-        try:
-            rag_service.ensure_ready_for_queries()
-        except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Query engine not ready: {str(e)}")
-    
+async def query(req: QueryRequest):
     try:
-        answer = rag_service.query(
-            question=request.query,
-            context_length=request.context_length
-        )
-        
-        return QueryResponse(
-            answer=answer,
-            context_length=request.context_length
-        )
-        
+        passages = await hybrid_search(req.query, top_k=8)
+        answer = await generate_answer(req.query, passages)
+        return QueryResponse(answer=answer, passages_used=len(passages))
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+        logger.error("Error in POST /query: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

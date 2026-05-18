@@ -88,3 +88,17 @@ logs/
 tmp/
 temp/
 .tmp/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+backend/venv/
+backend/.venv/
+backend/*.egg-info/
+backend/dist/
+backend/build/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/.mypy_cache/
+

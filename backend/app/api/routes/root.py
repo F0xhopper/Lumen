@@ -1,29 +1,18 @@
-"""Root endpoints for API information."""
-
-from typing import Dict
 from fastapi import APIRouter
 
 router = APIRouter()
 
 
-@router.get("/", response_model=Dict[str, str])
+@router.get("/")
 async def root():
-    """Root endpoint with API information."""
     return {
-        "message": "Aquinas RAG API",
-        "description": "Sophisticated RAG system for St. Thomas Aquinas works using Pinecone, OpenAI, and LlamaCloud",
-        "version": "1.0.0",
-        "configuration": {
-            "vector_store": "Pinecone",
-            "llm_provider": "OpenAI GPT-4o",
-            "embedding_provider": "OpenAI text-embedding-3-large",
-            "parsing": "LlamaCloud"
-        },
+        "name": "Lumen API",
+        "description": "Summa Theologica — PostgreSQL + Pinecone hybrid search + GPT-4.1",
         "endpoints": {
-            "query": "/query",
-            "upload": "/upload",
-            "passages": "/passages",
-            "status": "/status",
-            "docs": "/docs"
-        }
+            "passages": "GET /passages?query=...&top_k=8",
+            "article": "GET /article?part_id=prima-pars&question_n=2&article_n=3",
+            "query": "POST /query",
+            "health": "GET /health",
+            "docs": "/docs",
+        },
     }

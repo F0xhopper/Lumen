@@ -1,26 +1,26 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Cardo } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+
+const cardo = Cardo({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-cardo",
+});
 
 export const metadata: Metadata = {
-  title: "Congo MVP Frontend",
-  description:
-    "A Next.js frontend for the Congo MVP application with chat and markdown rendering",
+  title: "Lumen — Summa Theologica",
+  description: "Study the Summa Theologica of St. Thomas Aquinas with AI-powered search and retrieval",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={inter.className}>
-        <div className="min-h-screen bg-background text-foreground">
-          {children}
-        </div>
+    <html lang="en" className={`dark ${inter.variable} ${cardo.variable}`}>
+      <body className={`${inter.className} antialiased`}>
+        {children}
       </body>
     </html>
   );

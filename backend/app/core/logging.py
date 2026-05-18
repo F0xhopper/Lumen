@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 
 
-def setup_logging(log_level: str = "INFO", log_file: Optional[str] = "aquinas_rag.log"):
+def setup_logging(log_level: str = "INFO", log_file: Optional[str] = "lumen.log"):
     """Set up logging configuration."""
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
