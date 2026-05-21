@@ -6,7 +6,7 @@ from app.core.logging import setup_logging, get_logger
 from app.core.dependencies import init_db, close_db
 from app.api.middleware.cors import add_cors_middleware
 from app.api.middleware.error_handlers import add_error_handlers
-from app.api.routes import root, query, passages, article, status
+from app.api.routes import root, query, passages, article, articles, status
 from app.repositories.article_repo import ensure_schema
 
 setup_logging(settings.LOG_LEVEL)
@@ -42,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(query.router)
     app.include_router(passages.router)
     app.include_router(article.router)
+    app.include_router(articles.router)
     app.include_router(status.router)
 
     return app

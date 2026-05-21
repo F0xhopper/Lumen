@@ -43,14 +43,10 @@ def clean(text: str) -> str:
 
 # ── Section parsing ────────────────────────────────────────────────────────────
 
-OBJ_RE   = re.compile(r"^Objection\s+(\d+)\.", re.IGNORECASE)
-REPLY_RE = re.compile(r"^Reply to Objection\s+(\d+)\.", re.IGNORECASE)
-SC_RE    = re.compile(r"^On the contrary", re.IGNORECASE)
-ANS_RE   = re.compile(r"^I answer that", re.IGNORECASE)
-
-
-def _label(b_tag) -> str:
-    return clean(b_tag.get_text()) if b_tag else ""
+OBJ_RE   = re.compile(r"^Objection\s+(\d+)\.?", re.IGNORECASE)
+REPLY_RE = re.compile(r"^Reply to Objection\s+(\d+)\.?", re.IGNORECASE)
+SC_RE    = re.compile(r"^On the contrary[,.]?", re.IGNORECASE)
+ANS_RE   = re.compile(r"^I answer that[,.]?", re.IGNORECASE)
 
 
 def parse_sections(paragraphs: list[Tag]) -> dict:
@@ -86,29 +82,28 @@ def parse_sections(paragraphs: list[Tag]) -> dict:
             sections["replies"].append({"n": current_n, "text": text})
 
     for p in paragraphs:
-        b = p.find("b")
-        label = _label(b) if b else ""
+        text = clean(p.get_text())
+        if not text:
+            continue
 
-        m_obj   = OBJ_RE.match(label)
-        m_reply = REPLY_RE.match(label)
+        m_obj   = OBJ_RE.match(text)
+        m_reply = REPLY_RE.match(text)
 
         if m_obj:
             flush()
-            current_type, current_n, current_parts = "obj", int(m_obj.group(1)), [clean(p.get_text())]
-        elif SC_RE.match(label):
+            current_type, current_n, current_parts = "obj", int(m_obj.group(1)), ([text] if text else [])
+        elif SC_RE.match(text):
             flush()
-            current_type, current_n, current_parts = "sc", None, [clean(p.get_text())]
-        elif ANS_RE.match(label):
+            current_type, current_n, current_parts = "sc", None, ([text] if text else [])
+        elif ANS_RE.match(text):
             flush()
-            current_type, current_n, current_parts = "ans", None, [clean(p.get_text())]
+            current_type, current_n, current_parts = "ans", None, ([text] if text else [])
         elif m_reply:
             flush()
-            current_type, current_n, current_parts = "reply", int(m_reply.group(1)), [clean(p.get_text())]
+            current_type, current_n, current_parts = "reply", int(m_reply.group(1)), ([text] if text else [])
         else:
             if current_type is not None:
-                t = clean(p.get_text())
-                if t:
-                    current_parts.append(t)
+                current_parts.append(text)
 
     flush()
     return sections

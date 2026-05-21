@@ -67,7 +67,8 @@ python -m scripts.index_summa     # embeds articles → Pinecone (~60-90 min for
 
 ## Key env vars
 ```
-DATABASE_URL=postgresql://user:pass@localhost:5432/lumen
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+DATABASE_SSL=true
 OPENAI_API_KEY=sk-...
 PINECONE_API_KEY=pcsk_...
 PINECONE_INDEX_NAME=lumen-summa

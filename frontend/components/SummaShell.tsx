@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Search, X, PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Search, X, PanelLeftOpen, PanelRightOpen, Sun, Moon } from "lucide-react";
 import SummaTree from "@/components/SummaTree";
 import ContentViewer from "@/components/ContentViewer";
 import AIChatPanel from "@/components/AIChatPanel";
@@ -43,7 +44,7 @@ function nodeFromParams(params: ReturnType<typeof useParams>): SelectedNode | nu
 
   const part = SUMMA_PARTS.find((p) => p.id === partId);
   if (!part) return null;
-  const question = part.questions.find((q) => q.n === questionN);
+  const question = part.treatises.flatMap((t) => t.questions).find((q) => q.n === questionN);
   if (!question) return null;
 
   const articleN = aRaw ? parseInt(aRaw, 10) : undefined;
@@ -63,6 +64,8 @@ export default function SummaShell({ children }: { children: React.ReactNode }) 
   const router = useRouter();
 
   const selected = nodeFromParams(params);
+
+  const { resolvedTheme, setTheme } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -144,10 +147,15 @@ export default function SummaShell({ children }: { children: React.ReactNode }) 
           </div>
         </form>
 
-        <div
-          className="ml-auto shrink-0 transition-[width] duration-200 ease-in-out"
-          style={{ width: rightW }}
-        />
+        <div className="ml-auto shrink-0 flex items-center pr-2" style={{ width: rightW }}>
+          <button
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+            title="Toggle theme"
+            className="ml-auto p-1.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
+          >
+            {resolvedTheme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
+        </div>
       </header>
 
       {/* ── Three panels ── */}

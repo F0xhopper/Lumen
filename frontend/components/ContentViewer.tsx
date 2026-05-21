@@ -56,21 +56,45 @@ function buildQuestionQuery(s: SelectedNode): string {
 
 // ── Article view (structured sections with anchors) ────────────────────────────
 
+const LABEL_RE = /^(Objection \d+\.|Reply to Objection \d+\.|On the contrary[,.]?|I answer that[,.]?)\s*/i;
+const QUOTE_RE = /("(?:[^"\\]|\\.)*")/g;
+
+function renderWithQuotes(text: string): React.ReactNode {
+  const parts = text.split(QUOTE_RE);
+  if (parts.length === 1) return text;
+  return (
+    <>
+      {parts.map((part, i) =>
+        QUOTE_RE.test(part) ? (
+          <span key={i} className="dark:text-amber-100/60 text-amber-900/60 italic">{part}</span>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
+function renderWithBoldLabel(text: string): React.ReactNode {
+  const m = LABEL_RE.exec(text);
+  const body = m ? text.slice(m[0].length) : text;
+  return (
+    <>
+      {m && <><strong className="font-semibold text-foreground/90">{m[1]}</strong>{" "}</>}
+      {renderWithQuotes(body)}
+    </>
+  );
+}
+
 function SectionBlock({
-  id, label, text, className,
+  id, text, className,
 }: {
-  id: string; label: string; text: string; className?: string;
+  id: string; text: string; className?: string;
 }) {
   return (
     <section id={id} className={cn("scroll-mt-6", className)}>
-      <p className={cn(
-        "font-inter text-[9px] tracking-[0.18em] uppercase mb-3",
-        id === "respondeo" ? "text-foreground/50" : "text-muted-foreground/40"
-      )}>
-        {label}
-      </p>
       <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/82 whitespace-pre-wrap">
-        {text}
+        {renderWithBoldLabel(text)}
       </p>
     </section>
   );
@@ -93,18 +117,13 @@ function ArticleView({ article }: { article: Article }) {
   return (
     <div className="max-w-prose space-y-9">
       {article.objections.map((obj) => (
-        <SectionBlock
-          key={obj.n}
-          id={`objection-${obj.n}`}
-          label={`Objection ${obj.n}`}
-          text={obj.text}
-        />
+        <SectionBlock key={obj.n} id={`objection-${obj.n}`} text={obj.text} />
       ))}
 
       {article.sed_contra && (
         <>
           <div className="h-px bg-border/25" />
-          <SectionBlock id="sed-contra" label="On the contrary" text={article.sed_contra} />
+          <SectionBlock id="sed-contra" text={article.sed_contra} />
         </>
       )}
 
@@ -113,7 +132,6 @@ function ArticleView({ article }: { article: Article }) {
           <div className="h-px bg-border/25" />
           <SectionBlock
             id="respondeo"
-            label="I answer that"
             text={article.respondeo}
             className="bg-foreground/[0.02] -mx-4 px-4 py-4 rounded"
           />
@@ -124,12 +142,7 @@ function ArticleView({ article }: { article: Article }) {
         <>
           <div className="h-px bg-border/25" />
           {article.replies.map((rep) => (
-            <SectionBlock
-              key={rep.n}
-              id={`reply-${rep.n}`}
-              label={`Reply to Objection ${rep.n}`}
-              text={rep.text}
-            />
+            <SectionBlock key={rep.n} id={`reply-${rep.n}`} text={rep.text} />
           ))}
         </>
       )}
@@ -324,39 +337,43 @@ export default function ContentViewer({
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="shrink-0 px-6 py-3.5 border-b border-border">
-        {renderHeader()}
+      <div className="shrink-0 px-7 py-3.5 border-b border-border">
+        <div className="max-w-prose mx-auto">
+          {renderHeader()}
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-7 py-7">
-        {isLoading && (
-          <div className="flex items-center gap-2.5 text-muted-foreground py-2">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span className="font-inter text-[9px] tracking-widest uppercase">
-              {isArticleMode ? "Loading article…" : "Retrieving passages…"}
-            </span>
-          </div>
-        )}
+        <div className="max-w-prose mx-auto">
+          {isLoading && (
+            <div className="flex items-center gap-2.5 text-muted-foreground py-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span className="font-inter text-[9px] tracking-widest uppercase">
+                {isArticleMode ? "Loading article…" : "Retrieving passages…"}
+              </span>
+            </div>
+          )}
 
-        {error && (
-          <p className="font-inter text-[11px] text-muted-foreground border border-border rounded p-4">
-            {error}
-          </p>
-        )}
+          {error && (
+            <p className="font-inter text-[11px] text-muted-foreground border border-border rounded p-4">
+              {error}
+            </p>
+          )}
 
-        {!isLoading && !error && isArticleMode && article && (
-          <ArticleView article={article} />
-        )}
+          {!isLoading && !error && isArticleMode && article && (
+            <ArticleView article={article} />
+          )}
 
-        {!isLoading && !error && !isArticleMode && passages.length === 0 && (
-          <p className="font-cardo italic text-[13px] text-muted-foreground/40">
-            No passages retrieved. The index may not contain this text yet.
-          </p>
-        )}
+          {!isLoading && !error && !isArticleMode && passages.length === 0 && (
+            <p className="font-cardo italic text-[13px] text-muted-foreground/40">
+              No passages retrieved. The index may not contain this text yet.
+            </p>
+          )}
 
-        {!isLoading && !isArticleMode && passages.length > 0 && (
-          <PassageList passages={passages} />
-        )}
+          {!isLoading && !isArticleMode && passages.length > 0 && (
+            <PassageList passages={passages} />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ class Settings:
     PINECONE_NAMESPACE: str = os.getenv("PINECONE_NAMESPACE", "summa")
 
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    DATABASE_SSL: bool = os.getenv("DATABASE_SSL", "false").lower() == "true"
 
     def check_required_vars(self) -> list[str]:
         missing = []

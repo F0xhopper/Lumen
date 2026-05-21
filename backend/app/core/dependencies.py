@@ -13,7 +13,8 @@ _pinecone_index = None
 
 async def init_db():
     global _db_pool
-    _db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+    ssl = "require" if settings.DATABASE_SSL else None
+    _db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10, ssl=ssl)
 
 
 async def close_db():

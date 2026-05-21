@@ -49,6 +49,20 @@ async def ensure_schema():
         await conn.execute(MIGRATE_SQL)
 
 
+async def get_articles_for_question(part_id: str, question_n: int) -> list[asyncpg.Record]:
+    pool = get_db_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """
+            SELECT article_n, article_title
+            FROM summa_articles
+            WHERE part_id = $1 AND question_n = $2
+            ORDER BY article_n
+            """,
+            part_id, question_n,
+        )
+
+
 async def get_article(part_id: str, question_n: int, article_n: int) -> Optional[asyncpg.Record]:
     pool = get_db_pool()
     async with pool.acquire() as conn:

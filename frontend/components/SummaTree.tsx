@@ -2,7 +2,8 @@
 
 import { useState, memo, useRef } from "react";
 import { ChevronRight, Search, X, PanelLeftClose } from "lucide-react";
-import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart } from "@/lib/summa-full";
+import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart, type SummaTreatise } from "@/lib/summa-full";
+import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { cn } from "@/lib/utils";
 
 interface SummaTreeProps {
@@ -11,40 +12,51 @@ interface SummaTreeProps {
   onCollapse: () => void;
 }
 
-/* ── Filtered flat result ── */
-interface FlatResult {
-  q: SummaQuestion;
-  part: SummaPart;
-}
+/* ── Filter result types ── */
+type FilterResult =
+  | { type: "part"; part: SummaPart }
+  | { type: "treatise"; treatise: SummaTreatise; part: SummaPart; ti: number }
+  | { type: "question"; q: SummaQuestion; part: SummaPart };
 
-function buildFilter(query: string): FlatResult[] | null {
-  const q = query.trim().toLowerCase();
-  if (!q) return null;
-  const results: FlatResult[] = [];
+function buildFilter(query: string): FilterResult[] | null {
+  const raw = query.trim();
+  if (!raw) return null;
+  const q = raw.toLowerCase();
+  const results: FilterResult[] = [];
   for (const part of SUMMA_PARTS) {
-    for (const question of part.questions) {
-      if (
-        question.title.toLowerCase().includes(q) ||
-        `q.${question.n}`.includes(q) ||
-        `${part.abbr} q.${question.n}`.toLowerCase().includes(q)
-      ) {
-        results.push({ q: question, part });
+    if (part.label.toLowerCase().includes(q) || part.abbr.toLowerCase().includes(q)) {
+      results.push({ type: "part", part });
+    }
+    for (let ti = 0; ti < part.treatises.length; ti++) {
+      const treatise = part.treatises[ti];
+      if (treatise.label.toLowerCase().includes(q)) {
+        results.push({ type: "treatise", treatise, part, ti });
+      }
+      for (const question of treatise.questions) {
+        if (
+          question.title.toLowerCase().includes(q) ||
+          `q.${question.n}`.includes(q) ||
+          `${part.abbr} q.${question.n}`.toLowerCase().includes(q)
+        ) {
+          results.push({ type: "question", q: question, part });
+        }
       }
     }
   }
-  return results.slice(0, 60);
+  return results.slice(0, 80);
 }
 
 /* ── Article row ── */
-const ArticleRow = memo(({ n, isSelected, onClick }: { n: number; isSelected: boolean; onClick: () => void }) => (
+const ArticleRow = memo(({ n, title, isSelected, onClick }: { n: number; title?: string; isSelected: boolean; onClick: () => void }) => (
   <button
     onClick={onClick}
     className={cn(
-      "w-full text-left px-4 py-[3px] text-[9px] font-mono transition-colors",
+      "w-full text-left px-4 py-[3px] transition-colors flex items-start gap-1.5",
       isSelected ? "bg-foreground/10 text-foreground" : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-accent"
     )}
   >
-    A.{n}
+    <span className="text-[9px] font-mono shrink-0 mt-px">A.{n}</span>
+    {title && <span className="text-[9px] leading-snug">{title}</span>}
   </button>
 ));
 ArticleRow.displayName = "ArticleRow";
@@ -61,6 +73,8 @@ const QuestionRow = memo(({
   onToggle: () => void;
 }) => {
   const isQSelected = selected?.partId === part.id && selected.questionN === q.n && selected.articleN === undefined;
+  const articleTitles = SUMMA_ARTICLE_TITLES[part.id]?.[q.n];
+  const articleCount = articleTitles?.length ?? q.articles;
 
   return (
     <div>
@@ -82,10 +96,11 @@ const QuestionRow = memo(({
       </button>
       {expanded && (
         <div className="pl-5 border-l border-border/40 ml-5">
-          {Array.from({ length: q.articles }, (_, i) => i + 1).map((n) => (
+          {Array.from({ length: articleCount }, (_, i) => i + 1).map((n) => (
             <ArticleRow
               key={n}
               n={n}
+              title={articleTitles?.find((a) => a.n === n)?.title}
               isSelected={selected?.partId === part.id && selected.questionN === q.n && selected.articleN === n}
               onClick={() => onSelect({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title, articleN: n })}
             />
@@ -97,15 +112,64 @@ const QuestionRow = memo(({
 });
 QuestionRow.displayName = "QuestionRow";
 
+/* ── Treatise row ── */
+const TreatiseRow = memo(({
+  treatise, part, selected, onSelect, expanded, onToggle, expandedQuestions, onToggleQuestion,
+}: {
+  treatise: SummaTreatise;
+  part: SummaPart;
+  selected: SelectedNode | null;
+  onSelect: (n: SelectedNode) => void;
+  expanded: boolean;
+  onToggle: () => void;
+  expandedQuestions: Set<string>;
+  onToggleQuestion: (key: string) => void;
+}) => (
+  <div>
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-1.5 px-3 py-1.5 hover:bg-accent text-left transition-colors"
+    >
+      <ChevronRight className={cn("h-2 w-2 shrink-0 text-muted-foreground/30 transition-transform", expanded && "rotate-90")} />
+      <span className="text-[8.5px] uppercase tracking-wide text-muted-foreground/40 leading-tight font-medium">
+        {treatise.label}
+      </span>
+    </button>
+    {expanded && (
+      <div className="border-l border-border/30 ml-4">
+        {treatise.questions.map((q) => {
+          const qKey = `${part.id}-q${q.n}`;
+          return (
+            <QuestionRow
+              key={q.n}
+              q={q}
+              part={part}
+              selected={selected}
+              onSelect={onSelect}
+              expanded={expandedQuestions.has(qKey)}
+              onToggle={() => onToggleQuestion(qKey)}
+            />
+          );
+        })}
+      </div>
+    )}
+  </div>
+));
+TreatiseRow.displayName = "TreatiseRow";
+
 /* ── Main tree ── */
 export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeProps) {
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
+  const [expandedTreatises, setExpandedTreatises] = useState<Set<string>>(new Set());
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
 
   const togglePart = (id: string) =>
     setExpandedParts((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const toggleTreatise = (key: string) =>
+    setExpandedTreatises((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   const toggleQuestion = (key: string) =>
     setExpandedQuestions((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -149,15 +213,50 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
         {filteredResults !== null ? (
           filteredResults.length === 0 ? (
             <p className="px-3 py-5 text-[10px] text-muted-foreground/35 italic font-cardo">
-              No matching questions
+              No results
             </p>
           ) : (
             <div>
-              {filteredResults.map(({ q, part }) => {
+              {filteredResults.map((result, i) => {
+                if (result.type === "part") {
+                  return (
+                    <button
+                      key={`part-${result.part.id}`}
+                      onClick={() => {
+                        setFilter("");
+                        setExpandedParts((prev) => { const n = new Set(prev); n.add(result.part.id); return n; });
+                      }}
+                      className="w-full text-left px-3 py-2 transition-colors border-b border-border/20 hover:bg-accent"
+                    >
+                      <p className="text-[8px] uppercase tracking-wide text-muted-foreground/40 mb-0.5">Part</p>
+                      <p className="text-[10px] font-medium text-foreground/80 leading-snug">{result.part.label}</p>
+                      <p className="text-[8.5px] font-mono text-muted-foreground/40 mt-0.5">{result.part.abbr}</p>
+                    </button>
+                  );
+                }
+                if (result.type === "treatise") {
+                  return (
+                    <button
+                      key={`treatise-${result.part.id}-${result.ti}`}
+                      onClick={() => {
+                        setFilter("");
+                        const tKey = `${result.part.id}-t${result.ti}`;
+                        setExpandedParts((prev) => { const n = new Set(prev); n.add(result.part.id); return n; });
+                        setExpandedTreatises((prev) => { const n = new Set(prev); n.add(tKey); return n; });
+                      }}
+                      className="w-full text-left px-3 py-2 transition-colors border-b border-border/20 hover:bg-accent"
+                    >
+                      <p className="text-[8px] uppercase tracking-wide text-muted-foreground/40 mb-0.5">Treatise · {result.part.abbr}</p>
+                      <p className="text-[10px] text-foreground/80 leading-snug">{result.treatise.label}</p>
+                      <p className="text-[8.5px] text-muted-foreground/40 mt-0.5">{result.treatise.questions.length} questions</p>
+                    </button>
+                  );
+                }
+                const { q, part } = result;
                 const isSel = selected?.partId === part.id && selected.questionN === q.n && selected.articleN === undefined;
                 return (
                   <button
-                    key={`${part.id}-${q.n}`}
+                    key={`q-${part.id}-${q.n}`}
                     onClick={() => onSelect({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title })}
                     className={cn(
                       "w-full text-left px-3 py-2 transition-colors border-b border-border/20 last:border-0",
@@ -183,22 +282,24 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
                   <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground/45 transition-transform", partExpanded && "rotate-90")} />
                   <div className="min-w-0">
                     <p className="text-[11px] font-medium text-foreground leading-tight">{part.label}</p>
-                    <p className="text-[9px] text-muted-foreground mt-px">{part.abbr} · {part.questions.length} qq.</p>
+                    <p className="text-[9px] text-muted-foreground mt-px">{part.abbr} · {part.treatises.reduce((s, t) => s + t.questions.length, 0)} qq.</p>
                   </div>
                 </button>
                 {partExpanded && (
                   <div className="border-l border-border/40 ml-4">
-                    {part.questions.map((q) => {
-                      const qKey = `${part.id}-q${q.n}`;
+                    {part.treatises.map((treatise, ti) => {
+                      const tKey = `${part.id}-t${ti}`;
                       return (
-                        <QuestionRow
-                          key={q.n}
-                          q={q}
+                        <TreatiseRow
+                          key={tKey}
+                          treatise={treatise}
                           part={part}
                           selected={selected}
                           onSelect={onSelect}
-                          expanded={expandedQuestions.has(qKey)}
-                          onToggle={() => toggleQuestion(qKey)}
+                          expanded={expandedTreatises.has(tKey)}
+                          onToggle={() => toggleTreatise(tKey)}
+                          expandedQuestions={expandedQuestions}
+                          onToggleQuestion={toggleQuestion}
                         />
                       );
                     })}
