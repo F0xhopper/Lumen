@@ -1,7 +1,6 @@
 """PostgreSQL queries for summa_articles."""
 
 import json
-from typing import Optional
 import asyncpg
 
 from app.core.dependencies import get_db_pool
@@ -63,7 +62,7 @@ async def get_articles_for_question(part_id: str, question_n: int) -> list[async
         )
 
 
-async def get_article(part_id: str, question_n: int, article_n: int) -> Optional[asyncpg.Record]:
+async def get_article(part_id: str, question_n: int, article_n: int) -> asyncpg.Record | None:
     pool = get_db_pool()
     async with pool.acquire() as conn:
         return await conn.fetchrow(
@@ -114,17 +113,17 @@ async def upsert_article(
     article_n: int,
     article_title: str,
     body: str,
-    sed_contra: Optional[str],
-    respondeo: Optional[str],
+    sed_contra: str | None,
+    respondeo: str | None,
     objections: list[dict],
     replies: list[dict],
-    source_url: Optional[str],
-    body_la: Optional[str] = None,
-    sed_contra_la: Optional[str] = None,
-    respondeo_la: Optional[str] = None,
-    objections_la: Optional[list[dict]] = None,
-    replies_la: Optional[list[dict]] = None,
-    source_url_la: Optional[str] = None,
+    source_url: str | None,
+    body_la: str | None = None,
+    sed_contra_la: str | None = None,
+    respondeo_la: str | None = None,
+    objections_la: list[dict] | None = None,
+    replies_la: list[dict] | None = None,
+    source_url_la: str | None = None,
 ):
     pool = get_db_pool()
     async with pool.acquire() as conn:
@@ -163,12 +162,12 @@ async def upsert_latin(
     part_id: str,
     question_n: int,
     article_n: int,
-    body_la: Optional[str],
-    sed_contra_la: Optional[str],
-    respondeo_la: Optional[str],
+    body_la: str | None,
+    sed_contra_la: str | None,
+    respondeo_la: str | None,
     objections_la: list[dict],
     replies_la: list[dict],
-    source_url_la: Optional[str],
+    source_url_la: str | None,
 ):
     """Update only the Latin fields for an existing article."""
     pool = get_db_pool()

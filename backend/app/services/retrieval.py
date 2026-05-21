@@ -1,7 +1,6 @@
 """Hybrid search against Pinecone (dense + sparse BM25)."""
 
 from pathlib import Path
-from typing import Optional
 
 from openai import AsyncOpenAI
 from pinecone_text.sparse import BM25Encoder
@@ -14,10 +13,10 @@ logger = get_logger(__name__)
 
 BM25_PARAMS_PATH = Path(__file__).parent.parent.parent / "data" / "bm25_params.json"
 
-_bm25: Optional[BM25Encoder] = None
+_bm25: BM25Encoder | None = None
 
 
-def _load_bm25() -> Optional[BM25Encoder]:
+def _load_bm25() -> BM25Encoder | None:
     global _bm25
     if _bm25 is not None:
         return _bm25

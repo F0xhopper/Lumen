@@ -5,8 +5,6 @@ from fastapi.responses import JSONResponse
 
 
 def add_error_handlers(app: FastAPI):
-    """Add error handlers to the FastAPI application."""
-    
     @app.exception_handler(404)
     async def not_found_handler(request, exc):
         return JSONResponse(

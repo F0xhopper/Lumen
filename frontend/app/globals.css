@@ -51,6 +51,11 @@
   }
 }
 
+::selection {
+  background: hsl(var(--foreground) / 0.28);
+  color: inherit;
+}
+
 ::-webkit-scrollbar {
   width: 4px;
 }
