@@ -1,9 +1,11 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.core.dependencies import init_db, close_db
+from app.services.retrieval import init_retrieval
 from app.api.middleware.cors import add_cors_middleware
 from app.api.middleware.error_handlers import add_error_handlers
 from app.api.routes import root, query, passages, article, articles, status
@@ -22,6 +24,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Lumen API — connecting to PostgreSQL and Pinecone…")
     await init_db()
     await ensure_schema()
+    await asyncio.to_thread(init_retrieval)
     logger.info("Ready.")
     yield
     await close_db()

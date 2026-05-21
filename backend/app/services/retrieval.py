@@ -1,5 +1,6 @@
-"""Hybrid search against Pinecone (dense + sparse BM25)."""
+"""Hybrid search: dense + sparse Pinecone query, cross-encoder reranking."""
 
+import asyncio
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -13,10 +14,14 @@ logger = get_logger(__name__)
 
 BM25_PARAMS_PATH = Path(__file__).parent.parent.parent / "data" / "bm25_params.json"
 
-_bm25: BM25Encoder | None = None
+_RERANK_FETCH_MULTIPLIER = 4
+_RERANK_FETCH_MAX        = 40
+
+_bm25   = None
+_ranker = None
 
 
-def _load_bm25() -> BM25Encoder | None:
+def _load_bm25():
     global _bm25
     if _bm25 is not None:
         return _bm25
@@ -28,55 +33,121 @@ def _load_bm25() -> BM25Encoder | None:
     return _bm25
 
 
+def _load_ranker():
+    global _ranker
+    if _ranker is not None:
+        return _ranker
+    try:
+        from sentence_transformers import CrossEncoder
+        model = settings.RERANKER_MODEL
+        logger.info("Loading reranker (%s)…", model)
+        _ranker = CrossEncoder(model, max_length=512)
+        logger.info("Reranker loaded.")
+    except Exception as e:
+        logger.warning("Could not load reranker (%s) — results will use Pinecone order.", e)
+        _ranker = None
+    return _ranker
+
+
+def init_retrieval() -> None:
+    """Preload BM25 and reranker at startup to avoid first-request latency."""
+    _load_bm25()
+    _load_ranker()
+
+
 async def embed(text: str) -> list[float]:
     client: AsyncOpenAI = get_openai()
     resp = await client.embeddings.create(model=settings.EMBED_MODEL, input=text)
     return resp.data[0].embedding
 
 
-async def hybrid_search(query: str, top_k: int = 8, alpha: float = 0.7) -> list[dict]:
+def _rerank_sync(ranker, query: str, candidates: list) -> list[tuple]:
     """
-    alpha=1.0 → pure semantic, alpha=0.0 → pure keyword, default 0.7.
-    Returns passage dicts including section and url_fragment fields.
+    Score (query, passage) pairs with ms-marco-MiniLM-L-6-v2.
+    predict() returns raw logits; sigmoid normalises to [0, 1].
+    512-token limit; 2048 chars ≈ 400-500 tokens.
+    """
+    import numpy as np
+    pairs = [
+        [query, (m.metadata or {}).get("text", "")[:2048]]
+        for m in candidates
+    ]
+    logits = ranker.predict(pairs)
+    scores = (1.0 / (1.0 + np.exp(-logits))).tolist()
+    return sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)
+
+
+async def hybrid_search(
+    query: str,
+    top_k: int = 8,
+    min_score: float = 0.3,
+    rerank: bool = True,
+) -> list[dict]:
+    """
+    1. Single hybrid Pinecone query (dense + sparse, alpha=0.7) fetches fetch_k candidates.
+       The index is dense-type and does not accept sparse-only queries, so true RRF
+       (two independent legs) is not possible — Pinecone handles the fusion internally.
+    2. ms-marco-MiniLM-L-6-v2 rescores the candidate pool (scores normalised to [0, 1]).
+    3. Results below min_score are dropped; top_k returned.
     """
     dense = await embed(query)
     index = get_pinecone_index()
     bm25  = _load_bm25()
 
-    query_kwargs: dict = {
+    fetch_k     = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
+    base_kwargs = {
         "namespace":        settings.PINECONE_NAMESPACE,
-        "top_k":            top_k,
+        "top_k":            fetch_k,
         "include_metadata": True,
     }
 
     if bm25 is not None:
         sparse = bm25.encode_queries(query)
-        query_kwargs["vector"]        = [v * alpha for v in dense]
-        query_kwargs["sparse_vector"] = {
-            "indices": sparse["indices"],
-            "values":  [v * (1 - alpha) for v in sparse["values"]],
-        }
+        result = await asyncio.to_thread(
+            index.query,
+            vector=[v * 0.7 for v in dense],
+            sparse_vector={
+                "indices": sparse["indices"],
+                "values":  [v * 0.3 for v in sparse["values"]],
+            },
+            **base_kwargs,
+        )
     else:
-        query_kwargs["vector"] = dense
+        result = await asyncio.to_thread(index.query, vector=dense, **base_kwargs)
 
-    result = index.query(**query_kwargs)
+    candidates = result.matches
+
+    if not candidates:
+        return []
+
+    ranker = _load_ranker() if rerank else None
+    if ranker is not None:
+        try:
+            ranked = await asyncio.to_thread(_rerank_sync, ranker, query, candidates)
+        except Exception as e:
+            logger.warning("Reranking failed (%s) — using Pinecone order.", e)
+            ranked = [(m, None) for m in candidates]
+    else:
+        ranked = [(m, None) for m in candidates]
 
     passages = []
-    for i, match in enumerate(result.matches, 1):
+    for rank, (match, score) in enumerate(ranked[:top_k], 1):
+        if score is not None and score < min_score:
+            break  # sorted descending — nothing below will pass
         meta = match.metadata or {}
         passages.append({
-            "rank":          i,
-            "text":          meta.get("text", ""),
-            "score":         round(match.score, 4),
-            "part_abbr":     meta.get("part_abbr", ""),
-            "question_n":    int(meta.get("question_n", 0)),
-            "article_n":     int(meta.get("article_n", 0)),
+            "rank":           rank,
+            "text":           meta.get("text", ""),
+            "score":          round(float(score), 4) if score is not None else 0.0,
+            "part_abbr":      meta.get("part_abbr", ""),
+            "question_n":     int(meta.get("question_n", 0)),
+            "article_n":      int(meta.get("article_n", 0)),
             "question_title": meta.get("question_title", ""),
-            "article_title": meta.get("article_title", ""),
-            "section":       meta.get("section", "body"),
-            "section_label": meta.get("section_label", ""),
-            "url_fragment":  meta.get("url_fragment", ""),
-            "article_url":   meta.get("article_url", ""),
-            "source_url":    meta.get("source_url", ""),
+            "article_title":  meta.get("article_title", ""),
+            "section":        meta.get("section", "body"),
+            "section_label":  meta.get("section_label", ""),
+            "url_fragment":   meta.get("url_fragment", ""),
+            "article_url":    meta.get("article_url", ""),
+            "source_url":     meta.get("source_url", ""),
         })
     return passages

@@ -14,6 +14,9 @@ pinecone-text>=0.9.0
 # OpenAI
 openai>=1.0.0
 
+# Reranking
+sentence-transformers>=3.0.0
+
 # Scraper (for import script)
 httpx>=0.27.0
 beautifulsoup4>=4.12.0

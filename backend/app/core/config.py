@@ -14,6 +14,8 @@ class Settings:
     EMBED_DIM: int = 3072
     CHAT_MODEL: str = "gpt-4.1"
 
+    RERANKER_MODEL: str = os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "lumen-summa")
     PINECONE_NAMESPACE: str = os.getenv("PINECONE_NAMESPACE", "summa")

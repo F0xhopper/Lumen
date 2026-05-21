@@ -61,14 +61,6 @@ interface Passage {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function sectionBadgeClass(section: string): string {
-  if (section === "respondeo")   return "text-foreground/70 border-foreground/20";
-  if (section === "sed_contra")  return "text-foreground/50 border-foreground/15";
-  if (section.startsWith("objection")) return "text-muted-foreground/60 border-border";
-  if (section.startsWith("reply"))     return "text-muted-foreground/50 border-border";
-  return "text-muted-foreground/40 border-border";
-}
-
 // ── Article view (structured sections with anchors) ────────────────────────────
 
 const LABEL_RE = /^(Objection \d+\.|Reply to Objection \d+\.|On the contrary[,.]?|I answer that[,.]?)\s*/i;
@@ -200,9 +192,38 @@ function QuestionIndex({ selected }: { selected: SelectedNode }) {
   );
 }
 
+// ── Search term highlighting ───────────────────────────────────────────────────
+
+function highlightTerms(text: string, query: string): React.ReactNode {
+  const tokens = query
+    .split(/\W+/)
+    .map((t) => t.replace(/[^a-z0-9']/gi, ""))
+    .filter((t) => t.length >= 3);
+  if (tokens.length === 0) return text;
+
+  const pattern = new RegExp(
+    `(${tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+    "gi"
+  );
+  const parts = text.split(pattern);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="bg-foreground/[0.09] text-foreground/95 rounded-[2px] px-px">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
 // ── Passage list (search mode) ─────────────────────────────────────────────────
 
-function PassageList({ passages }: { passages: Passage[] }) {
+function PassageList({ passages, searchQuery }: { passages: Passage[]; searchQuery: string }) {
   return (
     <div className="space-y-8 max-w-prose">
       {passages.map((p) => {
@@ -211,47 +232,42 @@ function PassageList({ passages }: { passages: Passage[] }) {
           : null;
         const loc = `${p.part_abbr} Q.${p.question_n} A.${p.article_n}`;
 
-        return (
-          <article key={p.rank}>
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] font-mono text-muted-foreground/30">[{p.rank}]</span>
-                {href ? (
-                  <Link
-                    href={href}
-                    className="font-inter text-[9px] tracking-wide text-muted-foreground/50 hover:text-foreground/70 transition-colors"
-                  >
-                    {loc}
-                  </Link>
-                ) : (
-                  <span className="font-inter text-[9px] tracking-wide text-muted-foreground/50">{loc}</span>
-                )}
-                {p.section_label && (
-                  <span className={cn(
-                    "font-inter text-[8px] tracking-[0.1em] uppercase px-1.5 py-0.5 border rounded",
-                    sectionBadgeClass(p.section)
-                  )}>
-                    {p.section_label}
-                  </span>
-                )}
-              </div>
+        const card = (
+          <>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-[9px] font-mono text-muted-foreground/30">[{p.rank}]</span>
+              <span className="font-inter text-[9px] tracking-wide text-muted-foreground/50">{loc}</span>
             </div>
 
-            <div className="h-px bg-border/30 mb-4" />
+            <div className="h-px bg-border/30 mb-3" />
+
+            <div className="mb-3">
+              <p className="font-cardo text-[13.5px] text-foreground/60 leading-snug">
+                {p.question_title}
+              </p>
+              {p.article_title && (
+                <p className="font-cardo italic text-[12px] text-muted-foreground/45 leading-snug mt-0.5">
+                  {p.article_title}
+                </p>
+              )}
+            </div>
 
             <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/80 whitespace-pre-wrap">
-              {p.text}
+              {highlightTerms(p.text, searchQuery)}
             </p>
+          </>
+        );
 
-            {href && (
-              <Link
-                href={href}
-                className="inline-block mt-3 font-inter text-[8.5px] tracking-widest uppercase text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
-              >
-                View in context →
-              </Link>
-            )}
-          </article>
+        return href ? (
+          <Link
+            key={p.rank}
+            href={href}
+            className="block -mx-3 px-3 py-2 rounded transition-colors hover:bg-foreground/[0.025]"
+          >
+            {card}
+          </Link>
+        ) : (
+          <article key={p.rank}>{card}</article>
         );
       })}
     </div>
@@ -546,7 +562,7 @@ export default function ContentViewer({
           )}
 
           {!isLoading && isSearchMode && passages.length > 0 && (
-            <PassageList passages={passages} />
+            <PassageList passages={passages} searchQuery={searchQuery} />
           )}
         </div>
       </div>

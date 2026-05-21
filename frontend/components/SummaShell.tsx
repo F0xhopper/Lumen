@@ -95,6 +95,14 @@ export default function SummaShell() {
     }
   }, [isMobile]);
 
+  // Clear search when navigating directly to an article URL (e.g. "View in context" click)
+  useEffect(() => {
+    if (selected?.articleN !== undefined) {
+      setSearchQuery("");
+      setSearchInput("");
+    }
+  }, [selected?.partId, selected?.questionN, selected?.articleN]);
+
   const handleTreeSelect = (node: SelectedNode) => {
     setSearchQuery("");
     setSearchInput("");
