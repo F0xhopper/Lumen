@@ -129,7 +129,17 @@ export default function SummaShell() {
   const clearSearch = () => {
     setSearchQuery("");
     setSearchInput("");
-    inputRef.current?.focus();
+    if (previousSelected) {
+      const slug = PART_TO_SLUG[previousSelected.partId];
+      if (previousSelected.articleN !== undefined) {
+        router.push(`/${slug}/${previousSelected.questionN}/${previousSelected.articleN}`);
+      } else {
+        router.push(`/${slug}/${previousSelected.questionN}`);
+      }
+      setPreviousSelected(null);
+    } else {
+      inputRef.current?.focus();
+    }
   };
 
   const leftW = leftOpen ? LEFT_W : STRIP_W;

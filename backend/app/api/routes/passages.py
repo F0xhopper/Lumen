@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 
-from app.services.retrieval import hybrid_search
+from app.services.retrieval import combined_search
 from app.models.schemas import PassageResult
 from app.core.logging import get_logger
 
@@ -15,7 +15,7 @@ async def get_passages(
     min_score: float = Query(0.3, ge=0.0, le=1.0),
 ):
     try:
-        return await hybrid_search(query, top_k=top_k, min_score=min_score, rerank=True)
+        return await combined_search(query, top_k=top_k, min_score=min_score, rerank=True)
     except Exception as e:
         logger.error("Error in GET /passages: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")

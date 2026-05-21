@@ -40,12 +40,27 @@ ALTER TABLE summa_articles
     ADD COLUMN IF NOT EXISTS source_url_la TEXT;
 """
 
+_TRGM_INDEX_SQLS = [
+    "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+    "CREATE INDEX IF NOT EXISTS idx_summa_respondeo_trgm  ON summa_articles USING gin (respondeo  gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS idx_summa_sed_contra_trgm ON summa_articles USING gin (sed_contra gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS idx_summa_body_trgm        ON summa_articles USING gin (body       gin_trgm_ops)",
+]
+
 
 async def ensure_schema():
     pool = get_db_pool()
     async with pool.acquire() as conn:
         await conn.execute(CREATE_TABLE_SQL)
         await conn.execute(MIGRATE_SQL)
+        try:
+            for sql in _TRGM_INDEX_SQLS:
+                await conn.execute(sql)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Could not create pg_trgm indexes (%s) — ILIKE search will be slower.", e
+            )
 
 
 async def get_articles_for_question(part_id: str, question_n: int) -> list[asyncpg.Record]:
@@ -102,6 +117,65 @@ async def mark_indexed(article_ids: list[int]):
         await conn.execute(
             "UPDATE summa_articles SET pinecone_indexed = TRUE WHERE id = ANY($1)",
             article_ids,
+        )
+
+
+async def ilike_search(query: str, limit: int = 8) -> list[asyncpg.Record]:
+    """Return one row per matching section (same granularity as Pinecone vectors)."""
+    pool = get_db_pool()
+    # Escape the ILIKE metacharacters so user input is treated as a literal string.
+    # '!' is our escape character; it must be escaped first to avoid double-escaping.
+    safe = query.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+    pattern = f"%{safe}%"
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """
+            SELECT part_id, part_abbr, question_n, question_title,
+                   article_n, article_title, source_url,
+                   sed_contra          AS text,
+                   'sed_contra'        AS section,
+                   'On the contrary'   AS section_label,
+                   'sed-contra'        AS url_fragment
+            FROM summa_articles
+            WHERE sed_contra ILIKE $1 ESCAPE '!'
+
+            UNION ALL
+
+            SELECT part_id, part_abbr, question_n, question_title,
+                   article_n, article_title, source_url,
+                   respondeo       AS text,
+                   'respondeo'     AS section,
+                   'I answer that' AS section_label,
+                   'respondeo'     AS url_fragment
+            FROM summa_articles
+            WHERE respondeo ILIKE $1 ESCAPE '!'
+
+            UNION ALL
+
+            SELECT a.part_id, a.part_abbr, a.question_n, a.question_title,
+                   a.article_n, a.article_title, a.source_url,
+                   obj->>'text'                        AS text,
+                   'objection_' || (obj->>'n')         AS section,
+                   'Objection ' || (obj->>'n')         AS section_label,
+                   'objection-' || (obj->>'n')         AS url_fragment
+            FROM summa_articles a, jsonb_array_elements(a.objections) AS obj
+            WHERE obj->>'text' ILIKE $1 ESCAPE '!'
+
+            UNION ALL
+
+            SELECT a.part_id, a.part_abbr, a.question_n, a.question_title,
+                   a.article_n, a.article_title, a.source_url,
+                   rep->>'text'                              AS text,
+                   'reply_' || (rep->>'n')                  AS section,
+                   'Reply to Objection ' || (rep->>'n')     AS section_label,
+                   'reply-' || (rep->>'n')                  AS url_fragment
+            FROM summa_articles a, jsonb_array_elements(a.replies) AS rep
+            WHERE rep->>'text' ILIKE $1 ESCAPE '!'
+
+            ORDER BY question_n, article_n
+            LIMIT $2
+            """,
+            pattern, limit,
         )
 
 

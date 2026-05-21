@@ -223,6 +223,15 @@ function highlightTerms(text: string, query: string): React.ReactNode {
 
 // ── Passage list (search mode) ─────────────────────────────────────────────────
 
+function sectionLabelClass(label: string): string {
+  const l = label.toLowerCase();
+  if (l.startsWith("i answer that"))   return "text-foreground/65";
+  if (l.startsWith("on the contrary")) return "text-foreground/50";
+  if (l.startsWith("objection"))       return "text-muted-foreground/40";
+  if (l.startsWith("reply to"))        return "text-muted-foreground/35";
+  return "text-muted-foreground/45";
+}
+
 function PassageList({ passages, searchQuery }: { passages: Passage[]; searchQuery: string }) {
   return (
     <div className="space-y-8 max-w-prose">
@@ -251,6 +260,12 @@ function PassageList({ passages, searchQuery }: { passages: Passage[]; searchQue
                 </p>
               )}
             </div>
+
+            {p.section_label && (
+              <p className={cn("font-inter text-[9px] tracking-widest uppercase mb-2", sectionLabelClass(p.section_label))}>
+                {p.section_label}
+              </p>
+            )}
 
             <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/80 whitespace-pre-wrap">
               {highlightTerms(p.text, searchQuery)}

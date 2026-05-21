@@ -14,10 +14,17 @@ logger = get_logger(__name__)
 
 BM25_PARAMS_PATH = Path(__file__).parent.parent.parent / "data" / "bm25_params.json"
 
-_RERANK_FETCH_MULTIPLIER = 4
-_RERANK_FETCH_MAX        = 40
+_PART_TO_SLUG = {
+    "prima-pars": "1",
+    "prima-secundae": "1-2",
+    "secunda-secundae": "2-2",
+    "tertia-pars": "3",
+}
 
-_bm25   = None
+_RERANK_FETCH_MULTIPLIER = 4
+_RERANK_FETCH_MAX = 40
+
+_bm25 = None
 _ranker = None
 
 
@@ -26,7 +33,9 @@ def _load_bm25():
     if _bm25 is not None:
         return _bm25
     if not BM25_PARAMS_PATH.exists():
-        logger.warning("BM25 params not found — sparse search disabled. Run scripts/index_summa.py first.")
+        logger.warning(
+            "BM25 params not found — sparse search disabled. Run scripts/index_summa.py first."
+        )
         return None
     _bm25 = BM25Encoder()
     _bm25.load(str(BM25_PARAMS_PATH))
@@ -39,12 +48,15 @@ def _load_ranker():
         return _ranker
     try:
         from sentence_transformers import CrossEncoder
+
         model = settings.RERANKER_MODEL
         logger.info("Loading reranker (%s)…", model)
         _ranker = CrossEncoder(model, max_length=512)
         logger.info("Reranker loaded.")
     except Exception as e:
-        logger.warning("Could not load reranker (%s) — results will use Pinecone order.", e)
+        logger.warning(
+            "Could not load reranker (%s) — results will use Pinecone order.", e
+        )
         _ranker = None
     return _ranker
 
@@ -62,19 +74,25 @@ async def embed(text: str) -> list[float]:
 
 
 def _rerank_sync(ranker, query: str, candidates: list) -> list[tuple]:
-    """
-    Score (query, passage) pairs with ms-marco-MiniLM-L-6-v2.
-    predict() returns raw logits; sigmoid normalises to [0, 1].
-    512-token limit; 2048 chars ≈ 400-500 tokens.
-    """
+    """Score (query, passage) pairs; sigmoid normalises logits to [0, 1]."""
     import numpy as np
-    pairs = [
-        [query, (m.metadata or {}).get("text", "")[:2048]]
-        for m in candidates
-    ]
+
+    pairs = [[query, (m.metadata or {}).get("text", "")[:2048]] for m in candidates]
     logits = ranker.predict(pairs)
     scores = (1.0 / (1.0 + np.exp(-logits))).tolist()
     return sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)
+
+
+async def _rerank_dicts(ranker, query: str, passages: list[dict]) -> list[dict]:
+    """Score a list of passage dicts in-place with the cross-encoder."""
+    import numpy as np
+
+    pairs = [[query, p["text"][:2048]] for p in passages]
+    logits = await asyncio.to_thread(ranker.predict, pairs)
+    scores = (1.0 / (1.0 + np.exp(-logits))).tolist()
+    for p, score in zip(passages, scores):
+        p["score"] = round(float(score), 4)
+    return passages
 
 
 async def hybrid_search(
@@ -92,12 +110,12 @@ async def hybrid_search(
     """
     dense = await embed(query)
     index = get_pinecone_index()
-    bm25  = _load_bm25()
+    bm25 = _load_bm25()
 
-    fetch_k     = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
+    fetch_k = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
     base_kwargs = {
-        "namespace":        settings.PINECONE_NAMESPACE,
-        "top_k":            fetch_k,
+        "namespace": settings.PINECONE_NAMESPACE,
+        "top_k": fetch_k,
         "include_metadata": True,
     }
 
@@ -108,7 +126,7 @@ async def hybrid_search(
             vector=[v * 0.7 for v in dense],
             sparse_vector={
                 "indices": sparse["indices"],
-                "values":  [v * 0.3 for v in sparse["values"]],
+                "values": [v * 0.3 for v in sparse["values"]],
             },
             **base_kwargs,
         )
@@ -135,19 +153,87 @@ async def hybrid_search(
         if score is not None and score < min_score:
             break  # sorted descending — nothing below will pass
         meta = match.metadata or {}
-        passages.append({
-            "rank":           rank,
-            "text":           meta.get("text", ""),
-            "score":          round(float(score), 4) if score is not None else 0.0,
-            "part_abbr":      meta.get("part_abbr", ""),
-            "question_n":     int(meta.get("question_n", 0)),
-            "article_n":      int(meta.get("article_n", 0)),
-            "question_title": meta.get("question_title", ""),
-            "article_title":  meta.get("article_title", ""),
-            "section":        meta.get("section", "body"),
-            "section_label":  meta.get("section_label", ""),
-            "url_fragment":   meta.get("url_fragment", ""),
-            "article_url":    meta.get("article_url", ""),
-            "source_url":     meta.get("source_url", ""),
-        })
+        passages.append(
+            {
+                "rank": rank,
+                "text": meta.get("text", ""),
+                "score": round(float(score), 4) if score is not None else 0.0,
+                "part_abbr": meta.get("part_abbr", ""),
+                "question_n": int(meta.get("question_n", 0)),
+                "article_n": int(meta.get("article_n", 0)),
+                "question_title": meta.get("question_title", ""),
+                "article_title": meta.get("article_title", ""),
+                "section": meta.get("section", "body"),
+                "section_label": meta.get("section_label", ""),
+                "url_fragment": meta.get("url_fragment", ""),
+                "article_url": meta.get("article_url", ""),
+                "source_url": meta.get("source_url", ""),
+            }
+        )
     return passages
+
+
+async def combined_search(
+    query: str,
+    top_k: int = 8,
+    min_score: float = 0.3,
+    rerank: bool = True,
+) -> list[dict]:
+    from app.repositories.article_repo import ilike_search
+
+    exact_raw, semantic = await asyncio.gather(
+        ilike_search(query, limit=top_k),
+        hybrid_search(query, top_k=top_k, min_score=min_score, rerank=rerank),
+    )
+
+    exact = []
+    for r in exact_raw:
+        slug = _PART_TO_SLUG.get(r["part_id"], r["part_id"])
+        exact.append(
+            {
+                "rank": 0,
+                "text": r["text"] or "",
+                "score": 0.0,
+                "part_abbr": r["part_abbr"],
+                "question_n": r["question_n"],
+                "article_n": r["article_n"],
+                "question_title": r["question_title"],
+                "article_title": r["article_title"],
+                "section": r["section"],
+                "section_label": r["section_label"],
+                "url_fragment": r["url_fragment"],
+                "article_url": f"/{slug}/{r['question_n']}/{r['article_n']}",
+                "source_url": r["source_url"],
+            }
+        )
+
+    # Rerank exact matches with the same cross-encoder so their scores are
+    # comparable to the semantic results and can be sorted together fairly.
+    if exact:
+        ranker = _load_ranker() if rerank else None
+        if ranker is not None:
+            try:
+                exact = await _rerank_dicts(ranker, query, exact)
+            except Exception as e:
+                logger.warning("Exact-match reranking failed (%s) — using default score.", e)
+                for r in exact:
+                    r["score"] = 0.85
+        else:
+            for r in exact:
+                r["score"] = 0.85
+
+    exact_keys = {
+        (r["part_abbr"], r["question_n"], r["article_n"], r["section"]) for r in exact
+    }
+    merged = exact + [
+        r
+        for r in semantic
+        if (r["part_abbr"], r["question_n"], r["article_n"], r["section"])
+        not in exact_keys
+    ]
+    merged.sort(key=lambda r: r["score"], reverse=True)
+
+    for i, r in enumerate(merged[:top_k], 1):
+        r["rank"] = i
+
+    return merged[:top_k]
