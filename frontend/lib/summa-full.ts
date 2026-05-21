@@ -695,3 +695,34 @@ export const SUMMA_PARTS: SummaPart[] = [
     ],
   },
 ];
+
+// ── Linear navigation ──────────────────────────────────────────────────────────
+
+type ArticleRef = Pick<SelectedNode, "partId" | "partLabel" | "partAbbr" | "questionN" | "questionTitle"> & { articleN: number };
+
+function buildLinearIndex(): ArticleRef[] {
+  const list: ArticleRef[] = [];
+  for (const part of SUMMA_PARTS) {
+    for (const treatise of part.treatises) {
+      for (const q of treatise.questions) {
+        for (let a = 1; a <= q.articles; a++) {
+          list.push({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title, articleN: a });
+        }
+      }
+    }
+  }
+  return list;
+}
+
+const LINEAR_INDEX: ArticleRef[] = buildLinearIndex();
+
+export function getAdjacentArticles(node: SelectedNode): { prev: SelectedNode | null; next: SelectedNode | null } {
+  if (node.articleN === undefined) return { prev: null, next: null };
+  const idx = LINEAR_INDEX.findIndex(
+    (a) => a.partId === node.partId && a.questionN === node.questionN && a.articleN === node.articleN
+  );
+  if (idx === -1) return { prev: null, next: null };
+  const toNode = (ref: ArticleRef | undefined): SelectedNode | null =>
+    ref ? { ...ref } : null;
+  return { prev: toNode(LINEAR_INDEX[idx - 1]), next: toNode(LINEAR_INDEX[idx + 1]) };
+}

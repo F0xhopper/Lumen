@@ -1,11 +1,22 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
-import type { SelectedNode } from "@/lib/summa-full";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { getAdjacentArticles, type SelectedNode } from "@/lib/summa-full";
 import { cn } from "@/lib/utils";
+
+const PART_TO_SLUG: Record<string, string> = {
+  "prima-pars":      "1",
+  "prima-secundae":  "1-2",
+  "secunda-secundae":"2-2",
+  "tertia-pars":     "3",
+};
+
+function articleUrl(node: SelectedNode): string {
+  return `/${PART_TO_SLUG[node.partId]}/${node.questionN}/${node.articleN}`;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -218,15 +229,25 @@ export default function ContentViewer({
   searchQuery: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
   const [passages, setPassages] = useState<Passage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const { prev: prevNode, next: nextNode } = selected
+    ? getAdjacentArticles(selected)
+    : { prev: null, next: null };
+
   const isArticleMode = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
   const isSearchMode  = Boolean(searchQuery.trim());
   const isQuestionMode = Boolean(selected && selected.articleN === undefined && !searchQuery.trim());
+
+  // Reset scroll position on article change
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [selected?.partId, selected?.questionN, selected?.articleN]);
 
   // Scroll to hash section after article loads
   useEffect(() => {
@@ -338,8 +359,30 @@ export default function ContentViewer({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="shrink-0 px-7 py-3.5 border-b border-border">
-        <div className="max-w-prose mx-auto">
-          {renderHeader()}
+        <div className="max-w-prose mx-auto flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            {renderHeader()}
+          </div>
+          {isArticleMode && (
+            <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+              <button
+                onClick={() => prevNode && router.push(articleUrl(prevNode))}
+                disabled={!prevNode}
+                title={prevNode ? `${prevNode.partAbbr} Q.${prevNode.questionN} A.${prevNode.articleN}` : undefined}
+                className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => nextNode && router.push(articleUrl(nextNode))}
+                disabled={!nextNode}
+                title={nextNode ? `${nextNode.partAbbr} Q.${nextNode.questionN} A.${nextNode.articleN}` : undefined}
+                className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
