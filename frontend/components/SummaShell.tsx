@@ -81,6 +81,7 @@ export default function SummaShell() {
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [previousSelected, setPreviousSelected] = useState<SelectedNode | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +107,7 @@ export default function SummaShell() {
   const handleTreeSelect = (node: SelectedNode) => {
     setSearchQuery("");
     setSearchInput("");
+    setPreviousSelected(null);
     if (isMobile) setLeftOpen(false);
     const slug = PART_TO_SLUG[node.partId];
     if (node.articleN !== undefined) {
@@ -119,6 +121,7 @@ export default function SummaShell() {
     e.preventDefault();
     const q = searchInput.trim();
     if (!q) return;
+    if (selected) setPreviousSelected(selected);
     setSearchQuery(q);
     if (str(params.part)) router.push("/");
   };
@@ -267,7 +270,20 @@ export default function SummaShell() {
           <ContentViewer
             selected={selected}
             searchQuery={searchQuery}
-            onHighlightSearch={(text) => { setSearchQuery(text); setSearchInput(text); }}
+            previousSelected={previousSelected}
+            onBack={() => {
+              if (!previousSelected) return;
+              setSearchQuery("");
+              setSearchInput("");
+              const slug = PART_TO_SLUG[previousSelected.partId];
+              if (previousSelected.articleN !== undefined) {
+                router.push(`/${slug}/${previousSelected.questionN}/${previousSelected.articleN}`);
+              } else {
+                router.push(`/${slug}/${previousSelected.questionN}`);
+              }
+              setPreviousSelected(null);
+            }}
+            onHighlightSearch={(text) => { if (selected) setPreviousSelected(selected); setSearchQuery(text); setSearchInput(text); }}
           />
         </main>
 

@@ -341,12 +341,16 @@ function HighlightMenu({
 export default function ContentViewer({
   selected,
   searchQuery,
+  previousSelected,
+  onBack,
   onHighlightNote,
   onHighlightSearch,
   onHighlightAddToChat,
 }: {
   selected: SelectedNode | null;
   searchQuery: string;
+  previousSelected?: SelectedNode | null;
+  onBack?: () => void;
   onHighlightNote?: (text: string) => void;
   onHighlightSearch?: (text: string) => void;
   onHighlightAddToChat?: (text: string) => void;
@@ -480,9 +484,27 @@ export default function ContentViewer({
   const renderHeader = () => {
     if (isSearchMode) return (
       <>
-        <p className="font-inter text-[9px] tracking-widest uppercase text-muted-foreground/50 mb-1">
-          Search results
-        </p>
+        <div className="flex items-center gap-2 mb-1">
+          <p className="font-inter text-[9px] tracking-widest uppercase text-muted-foreground/50">
+            Search results
+          </p>
+          {!isLoading && passages.length > 0 && (
+            <span className="font-mono text-[9px] text-muted-foreground/30">{passages.length}</span>
+          )}
+          {previousSelected && onBack && (
+            <button
+              onClick={onBack}
+              title={`Back to ${previousSelected.partAbbr} Q.${previousSelected.questionN}${previousSelected.articleN !== undefined ? ` A.${previousSelected.articleN}` : ""}`}
+              className="flex items-center gap-0.5 font-inter text-[9px] tracking-wide text-muted-foreground/40 hover:text-foreground/70 transition-colors"
+            >
+              <ChevronLeft className="h-2.5 w-2.5" />
+              <span>
+                {previousSelected.partAbbr} Q.{previousSelected.questionN}
+                {previousSelected.articleN !== undefined && ` A.${previousSelected.articleN}`}
+              </span>
+            </button>
+          )}
+        </div>
         <p className="font-cardo italic text-[15px] text-foreground/75 leading-snug">{searchQuery}</p>
       </>
     );
