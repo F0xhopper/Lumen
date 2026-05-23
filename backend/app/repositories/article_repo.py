@@ -48,15 +48,24 @@ _TRGM_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_summa_body_trgm        ON summa_articles USING gin (body       gin_trgm_ops)",
 ]
 
-_ILIKE_SQL = """
+_FTS_INDEX_SQLS = [
+    "CREATE INDEX IF NOT EXISTS idx_summa_respondeo_fts  ON summa_articles USING gin(to_tsvector('english', respondeo))",
+    "CREATE INDEX IF NOT EXISTS idx_summa_sed_contra_fts ON summa_articles USING gin(to_tsvector('english', sed_contra))",
+]
+
+_FTS_SQL = """
+WITH q AS (SELECT plainto_tsquery('english', $1) AS tsq)
+SELECT * FROM (
     SELECT part_id, part_abbr, question_n, question_title,
            article_n, article_title, source_url,
            sed_contra          AS text,
            'sed_contra'        AS section,
            'On the contrary'   AS section_label,
-           'sed-contra'        AS url_fragment
-    FROM summa_articles
-    WHERE sed_contra ILIKE $1 ESCAPE '!'
+           'sed-contra'        AS url_fragment,
+           ts_rank(to_tsvector('english', sed_contra), q.tsq) AS fts_rank
+    FROM summa_articles, q
+    WHERE sed_contra IS NOT NULL
+      AND to_tsvector('english', sed_contra) @@ q.tsq
 
     UNION ALL
 
@@ -65,9 +74,11 @@ _ILIKE_SQL = """
            respondeo       AS text,
            'respondeo'     AS section,
            'I answer that' AS section_label,
-           'respondeo'     AS url_fragment
-    FROM summa_articles
-    WHERE respondeo ILIKE $1 ESCAPE '!'
+           'respondeo'     AS url_fragment,
+           ts_rank(to_tsvector('english', respondeo), q.tsq) AS fts_rank
+    FROM summa_articles, q
+    WHERE respondeo IS NOT NULL
+      AND to_tsvector('english', respondeo) @@ q.tsq
 
     UNION ALL
 
@@ -76,9 +87,11 @@ _ILIKE_SQL = """
            obj->>'text'                        AS text,
            'objection_' || (obj->>'n')         AS section,
            'Objection ' || (obj->>'n')         AS section_label,
-           'objection-' || (obj->>'n')         AS url_fragment
-    FROM summa_articles a, jsonb_array_elements(a.objections) AS obj
-    WHERE obj->>'text' ILIKE $1 ESCAPE '!'
+           'objection-' || (obj->>'n')         AS url_fragment,
+           ts_rank(to_tsvector('english', obj->>'text'), q.tsq) AS fts_rank
+    FROM summa_articles a, jsonb_array_elements(a.objections) AS obj, q
+    WHERE obj->>'text' IS NOT NULL
+      AND to_tsvector('english', obj->>'text') @@ q.tsq
 
     UNION ALL
 
@@ -87,12 +100,14 @@ _ILIKE_SQL = """
            rep->>'text'                              AS text,
            'reply_' || (rep->>'n')                  AS section,
            'Reply to Objection ' || (rep->>'n')     AS section_label,
-           'reply-' || (rep->>'n')                  AS url_fragment
-    FROM summa_articles a, jsonb_array_elements(a.replies) AS rep
-    WHERE rep->>'text' ILIKE $1 ESCAPE '!'
-
-    ORDER BY question_n, article_n
-    LIMIT $2
+           'reply-' || (rep->>'n')                  AS url_fragment,
+           ts_rank(to_tsvector('english', rep->>'text'), q.tsq) AS fts_rank
+    FROM summa_articles a, jsonb_array_elements(a.replies) AS rep, q
+    WHERE rep->>'text' IS NOT NULL
+      AND to_tsvector('english', rep->>'text') @@ q.tsq
+) sub
+ORDER BY fts_rank DESC
+LIMIT $2
 """
 
 _PART_TO_SLUG = {
@@ -160,12 +175,10 @@ class ArticleRepository:
             )
         return [ArticleSummary(article_n=r["article_n"], article_title=r["article_title"]) for r in rows]
 
-    async def ilike_search(self, query: str, limit: int = 8) -> list[PassageResult]:
-        """Keyword search across all text sections; score placeholder filled by reranker."""
-        safe = query.replace("!", "!!").replace("%", "!%").replace("_", "!_")
-        pattern = f"%{safe}%"
+    async def fts_search(self, query: str, limit: int = 8) -> list[PassageResult]:
+        """Full-text search across all text sections; score placeholder filled by reranker."""
         async with self._pool.acquire() as conn:
-            rows = await conn.fetch(_ILIKE_SQL, pattern, limit)
+            rows = await conn.fetch(_FTS_SQL, query, limit)
         results = []
         for r in rows:
             slug = _PART_TO_SLUG.get(r["part_id"], r["part_id"])
@@ -203,6 +216,14 @@ async def ensure_schema():
             import logging
             logging.getLogger(__name__).warning(
                 "Could not create pg_trgm indexes (%s) — ILIKE search will be slower.", e
+            )
+        try:
+            for sql in _FTS_INDEX_SQLS:
+                await conn.execute(sql)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Could not create FTS indexes (%s) — full-text search will be slower.", e
             )
 
 

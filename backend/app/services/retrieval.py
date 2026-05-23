@@ -88,9 +88,9 @@ async def combined_search(
     min_score: float = 0.3,
     do_rerank: bool = True,
 ) -> list[PassageResult]:
-    """Parallel keyword (ILIKE) + semantic search; reranks both legs on a shared scale."""
+    """Parallel FTS + semantic search; reranks both legs on a shared scale."""
     exact_passages, semantic = await asyncio.gather(
-        article_repo.ilike_search(query, limit=top_k),
+        article_repo.fts_search(query, limit=top_k),
         hybrid_search(
             query, client, pinecone_repo,
             top_k=top_k, min_score=min_score, do_rerank=do_rerank,
@@ -107,6 +107,8 @@ async def combined_search(
             ]
         else:
             exact_passages = [p.model_copy(update={"score": 0.85}) for p in exact_passages]
+
+    exact_passages = [p for p in exact_passages if p.score >= min_score]
 
     exact_keys = {(p.part_abbr, p.question_n, p.article_n, p.section) for p in exact_passages}
     merged = exact_passages + [

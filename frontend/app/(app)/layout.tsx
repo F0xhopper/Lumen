@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import SummaShell from "@/components/SummaShell";
 
 export default function AppLayout() {
-  return <SummaShell />;
+  return (
+    <Suspense>
+      <SummaShell />
+    </Suspense>
+  );
 }

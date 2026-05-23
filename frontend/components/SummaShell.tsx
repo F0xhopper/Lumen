@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Search, X, PanelLeftOpen, PanelRightOpen, Sun, Moon, Menu, MessageSquare } from "lucide-react";
 import SummaTree from "@/components/SummaTree";
@@ -74,6 +74,7 @@ function useIsMobile() {
 export default function SummaShell() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isMobile = useIsMobile();
   const selected = nodeFromParams(params);
   const { resolvedTheme, setTheme } = useTheme();
@@ -96,13 +97,12 @@ export default function SummaShell() {
     }
   }, [isMobile]);
 
-  // Clear search when navigating directly to an article URL (e.g. "View in context" click)
+  // Sync ?q= param → state: restores search on back-navigation, clears it on article nav
   useEffect(() => {
-    if (selected?.articleN !== undefined) {
-      setSearchQuery("");
-      setSearchInput("");
-    }
-  }, [selected?.partId, selected?.questionN, selected?.articleN]);
+    const q = searchParams.get("q") ?? "";
+    setSearchQuery(q);
+    setSearchInput(q);
+  }, [searchParams]);
 
   const handleTreeSelect = (node: SelectedNode) => {
     setSearchQuery("");
@@ -123,7 +123,12 @@ export default function SummaShell() {
     if (!q) return;
     if (selected) setPreviousSelected(selected);
     setSearchQuery(q);
-    if (str(params.part)) router.push("/");
+    // push from article pages so back returns there; replace within search to avoid stacking
+    if (str(params.part)) {
+      router.push(`/?q=${encodeURIComponent(q)}`);
+    } else {
+      router.replace(`/?q=${encodeURIComponent(q)}`);
+    }
   };
 
   const clearSearch = () => {
@@ -138,6 +143,7 @@ export default function SummaShell() {
       }
       setPreviousSelected(null);
     } else {
+      router.replace("/");
       inputRef.current?.focus();
     }
   };
@@ -293,7 +299,7 @@ export default function SummaShell() {
               }
               setPreviousSelected(null);
             }}
-            onHighlightSearch={(text) => { if (selected) setPreviousSelected(selected); setSearchQuery(text); setSearchInput(text); }}
+            onHighlightSearch={(text) => { if (selected) setPreviousSelected(selected); setSearchQuery(text); setSearchInput(text); router.push(`/?q=${encodeURIComponent(text)}`); }}
           />
         </main>
 
