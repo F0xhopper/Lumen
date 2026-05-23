@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, memo, useRef } from "react";
+import { useState, memo, useRef, useEffect } from "react";
 import { ChevronRight, Search, X, PanelLeftClose } from "lucide-react";
-import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart, type SummaTreatise } from "@/lib/summa-full";
+import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ interface SummaTreeProps {
 /* ── Filter result types ── */
 type FilterResult =
   | { type: "part"; part: SummaPart }
-  | { type: "treatise"; treatise: SummaTreatise; part: SummaPart; ti: number }
+  | { type: "treatise"; treatise: { label: string; questions: SummaQuestion[] }; part: SummaPart; ti: number }
   | { type: "question"; q: SummaQuestion; part: SummaPart };
 
 function buildFilter(query: string): FilterResult[] | null {
@@ -46,10 +46,19 @@ function buildFilter(query: string): FilterResult[] | null {
   return results.slice(0, 80);
 }
 
+/* ── Treatise divider ── */
+const TreatiseDivider = memo(({ label }: { label: string }) => (
+  <p className="px-3 pt-3 pb-1 text-[8px] uppercase tracking-widest text-muted-foreground/30 font-medium select-none">
+    {label}
+  </p>
+));
+TreatiseDivider.displayName = "TreatiseDivider";
+
 /* ── Article row ── */
 const ArticleRow = memo(({ n, title, isSelected, onClick }: { n: number; title?: string; isSelected: boolean; onClick: () => void }) => (
   <button
     onClick={onClick}
+    data-selected={isSelected ? "" : undefined}
     className={cn(
       "w-full text-left px-4 py-[3px] transition-colors flex items-start gap-1.5",
       isSelected ? "bg-foreground/10 text-foreground" : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-accent"
@@ -83,6 +92,7 @@ const QuestionRow = memo(({
           onToggle();
           onSelect({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title });
         }}
+        data-selected={isQSelected ? "" : undefined}
         className={cn(
           "w-full flex items-start gap-1 px-2 py-[5px] text-left transition-colors group",
           isQSelected ? "bg-foreground/10" : "hover:bg-accent"
@@ -112,67 +122,38 @@ const QuestionRow = memo(({
 });
 QuestionRow.displayName = "QuestionRow";
 
-/* ── Treatise row ── */
-const TreatiseRow = memo(({
-  treatise, part, selected, onSelect, expanded, onToggle, expandedQuestions, onToggleQuestion,
-}: {
-  treatise: SummaTreatise;
-  part: SummaPart;
-  selected: SelectedNode | null;
-  onSelect: (n: SelectedNode) => void;
-  expanded: boolean;
-  onToggle: () => void;
-  expandedQuestions: Set<string>;
-  onToggleQuestion: (key: string) => void;
-}) => (
-  <div>
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-1.5 px-3 py-1.5 hover:bg-accent text-left transition-colors"
-    >
-      <ChevronRight className={cn("h-2 w-2 shrink-0 text-muted-foreground/30 transition-transform", expanded && "rotate-90")} />
-      <span className="text-[8.5px] uppercase tracking-wide text-muted-foreground/40 leading-tight font-medium">
-        {treatise.label}
-      </span>
-    </button>
-    {expanded && (
-      <div className="border-l border-border/30 ml-4">
-        {treatise.questions.map((q) => {
-          const qKey = `${part.id}-q${q.n}`;
-          return (
-            <QuestionRow
-              key={q.n}
-              q={q}
-              part={part}
-              selected={selected}
-              onSelect={onSelect}
-              expanded={expandedQuestions.has(qKey)}
-              onToggle={() => onToggleQuestion(qKey)}
-            />
-          );
-        })}
-      </div>
-    )}
-  </div>
-));
-TreatiseRow.displayName = "TreatiseRow";
-
 /* ── Main tree ── */
 export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeProps) {
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
-  const [expandedTreatises, setExpandedTreatises] = useState<Set<string>>(new Set());
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const togglePart = (id: string) =>
     setExpandedParts((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const toggleTreatise = (key: string) =>
-    setExpandedTreatises((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
-
   const toggleQuestion = (key: string) =>
     setExpandedQuestions((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+
+  /* Auto-expand and scroll to selected node */
+  useEffect(() => {
+    if (!selected) return;
+    setExpandedParts((prev) => {
+      if (prev.has(selected.partId)) return prev;
+      const n = new Set(prev); n.add(selected.partId); return n;
+    });
+    if (selected.articleN !== undefined) {
+      const qKey = `${selected.partId}-q${selected.questionN}`;
+      setExpandedQuestions((prev) => {
+        if (prev.has(qKey)) return prev;
+        const n = new Set(prev); n.add(qKey); return n;
+      });
+    }
+    setTimeout(() => {
+      scrollRef.current?.querySelector("[data-selected]")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 80);
+  }, [selected?.partId, selected?.questionN, selected?.articleN]);
 
   const filteredResults = buildFilter(filter);
 
@@ -209,7 +190,7 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain py-1 select-none">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain py-1 select-none">
         {filteredResults !== null ? (
           filteredResults.length === 0 ? (
             <p className="px-3 py-5 text-[10px] text-muted-foreground/35 italic font-cardo">
@@ -217,7 +198,7 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
             </p>
           ) : (
             <div>
-              {filteredResults.map((result, i) => {
+              {filteredResults.map((result) => {
                 if (result.type === "part") {
                   return (
                     <button
@@ -240,9 +221,7 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
                       key={`treatise-${result.part.id}-${result.ti}`}
                       onClick={() => {
                         setFilter("");
-                        const tKey = `${result.part.id}-t${result.ti}`;
                         setExpandedParts((prev) => { const n = new Set(prev); n.add(result.part.id); return n; });
-                        setExpandedTreatises((prev) => { const n = new Set(prev); n.add(tKey); return n; });
                       }}
                       className="w-full text-left px-3 py-2 transition-colors border-b border-border/20 hover:bg-accent"
                     >
@@ -287,22 +266,25 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
                 </button>
                 {partExpanded && (
                   <div className="border-l border-border/40 ml-4">
-                    {part.treatises.map((treatise, ti) => {
-                      const tKey = `${part.id}-t${ti}`;
-                      return (
-                        <TreatiseRow
-                          key={tKey}
-                          treatise={treatise}
-                          part={part}
-                          selected={selected}
-                          onSelect={onSelect}
-                          expanded={expandedTreatises.has(tKey)}
-                          onToggle={() => toggleTreatise(tKey)}
-                          expandedQuestions={expandedQuestions}
-                          onToggleQuestion={toggleQuestion}
-                        />
-                      );
-                    })}
+                    {part.treatises.map((treatise, ti) => (
+                      <div key={ti}>
+                        <TreatiseDivider label={treatise.label} />
+                        {treatise.questions.map((q) => {
+                          const qKey = `${part.id}-q${q.n}`;
+                          return (
+                            <QuestionRow
+                              key={q.n}
+                              q={q}
+                              part={part}
+                              selected={selected}
+                              onSelect={onSelect}
+                              expanded={expandedQuestions.has(qKey)}
+                              onToggle={() => toggleQuestion(qKey)}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
