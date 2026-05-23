@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Bookmark, Search, MessageSquare } from "lucide-react";
 import { getAdjacentArticles, type SelectedNode } from "@/lib/summa-full";
-import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { fetchArticle, fetchPassages, type Article, type Passage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -276,32 +275,6 @@ function ArticleView({ article, lang }: { article: Article; lang: LangMode }) {
   return <SideBySideArticleView article={article} />;
 }
 
-// ── Question index (article list when a question is selected) ─────────────────
-
-function QuestionIndex({ selected }: { selected: SelectedNode }) {
-  const router = useRouter();
-  const articles = SUMMA_ARTICLE_TITLES[selected.partId]?.[selected.questionN] ?? [];
-
-  return (
-    <div className="max-w-prose">
-      {articles.length === 0 ? (
-        <p className="font-cardo italic text-[13px] text-muted-foreground/40">No articles found.</p>
-      ) : articles.map((art) => (
-        <button
-          key={art.n}
-          onClick={() => router.push(`/${PART_TO_SLUG[selected.partId]}/${selected.questionN}/${art.n}`)}
-          className="w-full text-left group flex items-start gap-4 py-3.5 border-b border-border/20 last:border-0 -mx-2 px-2 rounded transition-colors hover:bg-foreground/[0.025]"
-        >
-          <span className="font-mono text-[10px] text-muted-foreground/35 shrink-0 mt-[3px]">A.{art.n}</span>
-          <span className="font-cardo text-[14px] text-foreground/70 group-hover:text-foreground/90 transition-colors leading-snug">
-            {art.title}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ── Search term highlighting ───────────────────────────────────────────────────
 
 function highlightTerms(text: string, query: string): React.ReactNode {
@@ -489,9 +462,8 @@ export default function ContentViewer({
     ? getAdjacentArticles(selected)
     : { prev: null, next: null };
 
-  const isArticleMode  = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
-  const isSearchMode   = Boolean(searchQuery.trim());
-  const isQuestionMode = Boolean(selected && selected.articleN === undefined && !searchQuery.trim());
+  const isArticleMode = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
+  const isSearchMode  = Boolean(searchQuery.trim());
 
   const resolvedPartId = selected
     ? (ABBR_TO_PART_ID[selected.partAbbr] ?? selected.partId)
@@ -706,10 +678,6 @@ export default function ContentViewer({
 
           {!isLoading && !error && isArticleMode && article && (
             <ArticleView article={article} lang={lang} />
-          )}
-
-          {!isLoading && !error && isQuestionMode && selected && (
-            <QuestionIndex selected={selected} />
           )}
 
           {!isLoading && !error && isSearchMode && passages.length === 0 && (

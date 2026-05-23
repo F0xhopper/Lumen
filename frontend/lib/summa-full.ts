@@ -726,3 +726,38 @@ export function getAdjacentArticles(node: SelectedNode): { prev: SelectedNode | 
     ref ? { ...ref } : null;
   return { prev: toNode(LINEAR_INDEX[idx - 1]), next: toNode(LINEAR_INDEX[idx + 1]) };
 }
+
+type QuestionRef = Pick<SelectedNode, "partId" | "partLabel" | "partAbbr" | "questionN" | "questionTitle">;
+
+function buildQuestionIndex(): QuestionRef[] {
+  const list: QuestionRef[] = [];
+  for (const part of SUMMA_PARTS) {
+    for (const treatise of part.treatises) {
+      for (const q of treatise.questions) {
+        list.push({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title });
+      }
+    }
+  }
+  return list;
+}
+
+const QUESTION_INDEX: QuestionRef[] = buildQuestionIndex();
+
+export function getAdjacentQuestions(node: SelectedNode): { prev: SelectedNode | null; next: SelectedNode | null } {
+  const idx = QUESTION_INDEX.findIndex(
+    (q) => q.partId === node.partId && q.questionN === node.questionN
+  );
+  if (idx === -1) return { prev: null, next: null };
+  const toNode = (ref: QuestionRef | undefined): SelectedNode | null =>
+    ref ? { ...ref } : null;
+  return { prev: toNode(QUESTION_INDEX[idx - 1]), next: toNode(QUESTION_INDEX[idx + 1]) };
+}
+
+export function getTreatiseForQuestion(partId: string, questionN: number): string | null {
+  const part = SUMMA_PARTS.find((p) => p.id === partId);
+  if (!part) return null;
+  for (const treatise of part.treatises) {
+    if (treatise.questions.some((q) => q.n === questionN)) return treatise.label;
+  }
+  return null;
+}

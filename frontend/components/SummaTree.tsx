@@ -12,43 +12,66 @@ interface SummaTreeProps {
   onCollapse: () => void;
 }
 
-/* ── Filter result types ── */
-type FilterResult =
-  | { type: "part"; part: SummaPart }
-  | { type: "treatise"; treatise: { label: string; questions: SummaQuestion[] }; part: SummaPart; ti: number }
-  | { type: "question"; q: SummaQuestion; part: SummaPart };
+/* ── Filter tree types ── */
+interface ArticleMatch { n: number; title: string }
+interface QuestionMatch { q: SummaQuestion; selfMatch: boolean; articles: ArticleMatch[] }
+interface TreatiseMatch { label: string; selfMatch: boolean; questions: QuestionMatch[] }
+interface PartMatch { part: SummaPart; selfMatch: boolean; treatises: TreatiseMatch[] }
 
-function buildFilter(query: string): FilterResult[] | null {
+function buildFilterTree(query: string): PartMatch[] | null {
   const raw = query.trim();
   if (!raw) return null;
-  const q = raw.toLowerCase();
-  const results: FilterResult[] = [];
+  const lq = raw.toLowerCase();
+
+  const tree: PartMatch[] = [];
+
   for (const part of SUMMA_PARTS) {
-    if (part.label.toLowerCase().includes(q) || part.abbr.toLowerCase().includes(q)) {
-      results.push({ type: "part", part });
-    }
-    for (let ti = 0; ti < part.treatises.length; ti++) {
-      const treatise = part.treatises[ti];
-      if (treatise.label.toLowerCase().includes(q)) {
-        results.push({ type: "treatise", treatise, part, ti });
-      }
-      for (const question of treatise.questions) {
-        if (
-          question.title.toLowerCase().includes(q) ||
-          `q.${question.n}`.includes(q) ||
-          `${part.abbr} q.${question.n}`.toLowerCase().includes(q)
-        ) {
-          results.push({ type: "question", q: question, part });
+    const partSelf = part.label.toLowerCase().includes(lq) || part.abbr.toLowerCase().includes(lq);
+    const treatises: TreatiseMatch[] = [];
+
+    for (const treatise of part.treatises) {
+      const treatiseSelf = treatise.label.toLowerCase().includes(lq);
+      const questions: QuestionMatch[] = [];
+
+      for (const q of treatise.questions) {
+        const qSelf =
+          q.title.toLowerCase().includes(lq) ||
+          `q.${q.n}`.includes(lq) ||
+          `${part.abbr} q.${q.n}`.toLowerCase().includes(lq);
+
+        const allArticles = SUMMA_ARTICLE_TITLES[part.id]?.[q.n] ?? [];
+        const articles = allArticles.filter(
+          (a) =>
+            a.title.toLowerCase().includes(lq) ||
+            `a.${a.n}`.includes(lq) ||
+            `q.${q.n} a.${a.n}`.includes(lq) ||
+            `${part.abbr} q.${q.n} a.${a.n}`.toLowerCase().includes(lq)
+        );
+
+        if (qSelf || articles.length > 0) {
+          questions.push({ q, selfMatch: qSelf, articles });
         }
       }
+
+      if (treatiseSelf || questions.length > 0) {
+        treatises.push({ label: treatise.label, selfMatch: treatiseSelf, questions });
+      }
+    }
+
+    if (partSelf || treatises.length > 0) {
+      tree.push({ part, selfMatch: partSelf, treatises });
     }
   }
-  return results.slice(0, 80);
+
+  return tree;
 }
 
 /* ── Treatise divider ── */
-const TreatiseDivider = memo(({ label }: { label: string }) => (
-  <p className="px-3 pt-3 pb-1 text-[8px] uppercase tracking-widest text-muted-foreground/30 font-medium select-none">
+const TreatiseDivider = memo(({ label, dim }: { label: string; dim?: boolean }) => (
+  <p className={cn(
+    "px-3 pt-3 pb-1 text-[8px] uppercase tracking-widest font-medium select-none",
+    dim ? "text-muted-foreground/20" : "text-muted-foreground/30"
+  )}>
     {label}
   </p>
 ));
@@ -88,10 +111,7 @@ const QuestionRow = memo(({
   return (
     <div>
       <button
-        onClick={() => {
-          onToggle();
-          onSelect({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title });
-        }}
+        onClick={onToggle}
         data-selected={isQSelected ? "" : undefined}
         className={cn(
           "w-full flex items-start gap-1 px-2 py-[5px] text-left transition-colors group",
@@ -155,7 +175,13 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
     }, 80);
   }, [selected?.partId, selected?.questionN, selected?.articleN]);
 
-  const filteredResults = buildFilter(filter);
+  const filterTree = buildFilterTree(filter);
+
+  const expandAndClear = (partId: string, qKey?: string) => {
+    setFilter("");
+    setExpandedParts((prev) => { const n = new Set(prev); n.add(partId); return n; });
+    if (qKey) setExpandedQuestions((prev) => { const n = new Set(prev); n.add(qKey); return n; });
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -168,7 +194,7 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter questions…"
+            placeholder="Filter…"
             className="w-full pl-6 pr-5 py-1.5 bg-secondary border border-border rounded text-[10px] text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:border-foreground/20 transition-colors"
           />
           {filter && (
@@ -191,65 +217,94 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
 
       {/* Content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain py-1 select-none">
-        {filteredResults !== null ? (
-          filteredResults.length === 0 ? (
-            <p className="px-3 py-5 text-[10px] text-muted-foreground/35 italic font-cardo">
-              No results
-            </p>
+
+        {/* ── Filter tree ── */}
+        {filterTree !== null ? (
+          filterTree.length === 0 ? (
+            <p className="px-3 py-5 text-[10px] text-muted-foreground/35 italic font-cardo">No results</p>
           ) : (
-            <div>
-              {filteredResults.map((result) => {
-                if (result.type === "part") {
-                  return (
-                    <button
-                      key={`part-${result.part.id}`}
-                      onClick={() => {
-                        setFilter("");
-                        setExpandedParts((prev) => { const n = new Set(prev); n.add(result.part.id); return n; });
-                      }}
-                      className="w-full text-left px-3 py-2 transition-colors border-b border-border/20 hover:bg-accent"
-                    >
-                      <p className="text-[8px] uppercase tracking-wide text-muted-foreground/40 mb-0.5">Part</p>
-                      <p className="text-[10px] font-medium text-foreground/80 leading-snug">{result.part.label}</p>
-                      <p className="text-[8.5px] font-mono text-muted-foreground/40 mt-0.5">{result.part.abbr}</p>
-                    </button>
-                  );
-                }
-                if (result.type === "treatise") {
-                  return (
-                    <button
-                      key={`treatise-${result.part.id}-${result.ti}`}
-                      onClick={() => {
-                        setFilter("");
-                        setExpandedParts((prev) => { const n = new Set(prev); n.add(result.part.id); return n; });
-                      }}
-                      className="w-full text-left px-3 py-2 transition-colors border-b border-border/20 hover:bg-accent"
-                    >
-                      <p className="text-[8px] uppercase tracking-wide text-muted-foreground/40 mb-0.5">Treatise · {result.part.abbr}</p>
-                      <p className="text-[10px] text-foreground/80 leading-snug">{result.treatise.label}</p>
-                      <p className="text-[8.5px] text-muted-foreground/40 mt-0.5">{result.treatise.questions.length} questions</p>
-                    </button>
-                  );
-                }
-                const { q, part } = result;
-                const isSel = selected?.partId === part.id && selected.questionN === q.n && selected.articleN === undefined;
-                return (
-                  <button
-                    key={`q-${part.id}-${q.n}`}
-                    onClick={() => onSelect({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title })}
-                    className={cn(
-                      "w-full text-left px-3 py-2 transition-colors border-b border-border/20 last:border-0",
-                      isSel ? "bg-foreground/10" : "hover:bg-accent"
-                    )}
-                  >
-                    <p className="text-[8.5px] font-mono text-muted-foreground/45 mb-0.5">{part.abbr} · Q.{q.n}</p>
-                    <p className="text-[10px] text-foreground/80 leading-snug">{q.title}</p>
-                  </button>
-                );
-              })}
-            </div>
+            filterTree.map((pm) => (
+              <div key={pm.part.id}>
+                {/* Part header */}
+                <button
+                  onClick={() => expandAndClear(pm.part.id)}
+                  className="w-full flex items-center gap-1.5 px-3 py-2.5 hover:bg-accent text-left transition-colors"
+                >
+                  <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/45 rotate-90" />
+                  <div className="min-w-0">
+                    <p className={cn("text-[11px] font-medium leading-tight", pm.selfMatch ? "text-foreground" : "text-foreground/55")}>
+                      {pm.part.label}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground/50 mt-px">{pm.part.abbr}</p>
+                  </div>
+                </button>
+
+                {/* Treatises */}
+                <div className="border-l border-border/40 ml-4">
+                  {pm.treatises.map((tm, ti) => (
+                    <div key={ti}>
+                      <TreatiseDivider label={tm.label} dim={!tm.selfMatch && tm.questions.length === 0} />
+
+                      {/* Questions */}
+                      {tm.questions.map((qm) => (
+                        <div key={qm.q.n}>
+                          <button
+                            onClick={() => expandAndClear(pm.part.id, `${pm.part.id}-q${qm.q.n}`)}
+                            className={cn(
+                              "w-full flex items-start gap-1 px-2 py-[5px] text-left transition-colors group",
+                              selected?.partId === pm.part.id && selected.questionN === qm.q.n && selected.articleN === undefined
+                                ? "bg-foreground/10"
+                                : "hover:bg-accent"
+                            )}
+                          >
+                            <ChevronRight className={cn(
+                              "h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/30 transition-transform",
+                              qm.articles.length > 0 && "rotate-90"
+                            )} />
+                            <span className="text-[9px] font-mono text-muted-foreground/45 shrink-0 mt-px">{qm.q.n}.</span>
+                            <span className={cn(
+                              "text-[10px] leading-snug",
+                              qm.selfMatch ? "text-foreground/90" : "text-foreground/55 group-hover:text-foreground/80"
+                            )}>
+                              {qm.q.title}
+                            </span>
+                          </button>
+
+                          {/* Matching articles */}
+                          {qm.articles.length > 0 && (
+                            <div className="pl-5 border-l border-border/40 ml-5">
+                              {qm.articles.map((art) => {
+                                const isSel = selected?.partId === pm.part.id && selected.questionN === qm.q.n && selected.articleN === art.n;
+                                return (
+                                  <button
+                                    key={art.n}
+                                    onClick={() => {
+                                      setFilter("");
+                                      onSelect({ partId: pm.part.id, partLabel: pm.part.label, partAbbr: pm.part.abbr, questionN: qm.q.n, questionTitle: qm.q.title, articleN: art.n });
+                                    }}
+                                    className={cn(
+                                      "w-full text-left px-4 py-[3px] transition-colors flex items-start gap-1.5",
+                                      isSel ? "bg-foreground/10 text-foreground" : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-accent"
+                                    )}
+                                  >
+                                    <span className="text-[9px] font-mono shrink-0 mt-px">A.{art.n}</span>
+                                    <span className="text-[9px] leading-snug">{art.title}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
           )
         ) : (
+
+          /* ── Normal tree ── */
           SUMMA_PARTS.map((part) => {
             const partExpanded = expandedParts.has(part.id);
             return (
