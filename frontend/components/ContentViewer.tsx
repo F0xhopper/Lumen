@@ -30,7 +30,23 @@ function articleUrl(node: SelectedNode): string {
 
 // ── Article view (structured sections with anchors) ────────────────────────────
 
-const LABEL_RE = /^(Objection \d+\.|Reply to Objection \d+\.|On the contrary[,.]?|I answer that[,.]?)\s*/i;
+const ORDINALS = "primum|secundum|tertium|quartum|quintum|sextum|septimum|octavum|nonum|decimum";
+const LABEL_RE = new RegExp(
+  "^(" +
+    // English
+    "Objection \\d+\\.|" +
+    "Reply to Objection \\d+\\.|" +
+    "On the contrary[,.]?|" +
+    "I answer that[,.]?|" +
+    // Latin
+    `Ad (?:${ORDINALS}) sic proceditur[.]?|` +
+    "Praeterea[.,]?|" +
+    "Sed contra(?:\\s+est)?[.,]?|" +
+    "Respondeo dicendum[,.]?|" +
+    `Ad (?:${ORDINALS}) (?:ergo )?dicendum[,.]?` +
+  ")\\s*",
+  "i"
+);
 const QUOTE_RE = /("(?:[^"\\]|\\.)*")/;
 
 function renderWithQuotes(text: string): React.ReactNode {
@@ -51,10 +67,15 @@ function renderWithQuotes(text: string): React.ReactNode {
 
 function rubricClass(label: string): string {
   const l = label.toLowerCase();
-  if (l.startsWith("i answer that"))   return "font-semibold text-foreground";
-  if (l.startsWith("on the contrary")) return "font-semibold text-foreground/80";
-  if (l.startsWith("objection"))       return "font-semibold text-foreground/65";
-  if (l.startsWith("reply to"))        return "font-semibold text-foreground/60";
+  if (l.startsWith("i answer that"))              return "font-semibold text-foreground";
+  if (l.startsWith("respondeo"))                  return "font-semibold text-foreground";
+  if (l.startsWith("on the contrary"))            return "font-semibold text-foreground/80";
+  if (l.startsWith("sed contra"))                 return "font-semibold text-foreground/80";
+  if (l.startsWith("objection"))                  return "font-semibold text-foreground/65";
+  if (l.startsWith("ad ") && l.includes("sic"))  return "font-semibold text-foreground/65";
+  if (l.startsWith("praeterea"))                  return "font-semibold text-foreground/65";
+  if (l.startsWith("reply to"))                   return "font-semibold text-foreground/60";
+  if (l.startsWith("ad ") && l.includes("dicendum")) return "font-semibold text-foreground/60";
   return "font-semibold text-foreground/90";
 }
 
@@ -69,10 +90,12 @@ function renderWithBoldLabel(text: string): React.ReactNode {
   );
 }
 
+type LangMode = "en" | "la" | "both";
+
 function SectionBlock({
   id, text, className,
 }: {
-  id: string; text: string; className?: string;
+  id?: string; text: string; className?: string;
 }) {
   return (
     <section id={id} className={cn("scroll-mt-6", className)}>
@@ -83,54 +106,174 @@ function SectionBlock({
   );
 }
 
-function ArticleView({ article }: { article: Article }) {
-  const hasStructure = article.respondeo || article.sed_contra ||
-    article.objections.length > 0 || article.replies.length > 0;
+function ArticleColumn({ article, lang, withIds }: {
+  article: Article;
+  lang: "en" | "la";
+  withIds?: boolean;
+}) {
+  const isLatin     = lang === "la";
+  const objections  = isLatin ? article.objections_la  : article.objections;
+  const sed_contra  = isLatin ? article.sed_contra_la  : article.sed_contra;
+  const respondeo   = isLatin ? article.respondeo_la   : article.respondeo;
+  const replies     = isLatin ? article.replies_la     : article.replies;
+  const body        = isLatin ? article.body_la        : article.body;
+
+  const hasStructure = respondeo || sed_contra || objections.length > 0 || replies.length > 0;
+
+  if (isLatin && !hasStructure) {
+    return (
+      <p className="font-cardo italic text-[12px] text-muted-foreground/30">
+        Latin text not yet imported for this article.
+      </p>
+    );
+  }
 
   if (!hasStructure) {
     return (
-      <div className="max-w-prose">
-        <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/82 whitespace-pre-wrap">
-          {article.body}
-        </p>
-      </div>
+      <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/82 whitespace-pre-wrap">
+        {body}
+      </p>
     );
   }
 
   return (
-    <div className="max-w-prose space-y-9">
-      {article.objections.map((obj) => (
-        <SectionBlock key={obj.n} id={`objection-${obj.n}`} text={obj.text} />
+    <div className="space-y-9">
+      {objections.map((obj) => (
+        <SectionBlock key={obj.n} id={withIds ? `objection-${obj.n}` : undefined} text={obj.text} />
       ))}
 
-      {article.sed_contra && (
+      {sed_contra && (
         <>
           <div className="h-px bg-border/25" />
-          <SectionBlock id="sed-contra" text={article.sed_contra} />
+          <SectionBlock id={withIds ? "sed-contra" : undefined} text={sed_contra} />
         </>
       )}
 
-      {article.respondeo && (
+      {respondeo && (
         <>
           <div className="h-px bg-border/25" />
           <SectionBlock
-            id="respondeo"
-            text={article.respondeo}
+            id={withIds ? "respondeo" : undefined}
+            text={respondeo}
             className="bg-foreground/[0.02] -mx-4 px-4 py-4 rounded"
           />
         </>
       )}
 
-      {article.replies.length > 0 && (
+      {replies.length > 0 && (
         <>
           <div className="h-px bg-border/25" />
-          {article.replies.map((rep) => (
-            <SectionBlock key={rep.n} id={`reply-${rep.n}`} text={rep.text} />
+          {replies.map((rep) => (
+            <SectionBlock key={rep.n} id={withIds ? `reply-${rep.n}` : undefined} text={rep.text} />
           ))}
         </>
       )}
     </div>
   );
+}
+
+// Renders one section pair as a single grid row so both sides align at the top.
+// Without items-start, grid cells stretch to row height — the border-l on the
+// right column extends the full height of whichever side is taller.
+function SectionPairRow({ en, la, enId, respondeoStyle }: {
+  en: string | null;
+  la: string | null;
+  enId?: string;
+  respondeoStyle?: boolean;
+}) {
+  const extraClass = respondeoStyle ? "bg-foreground/[0.02] -mx-4 px-4 py-4 rounded" : undefined;
+  return (
+    <div className="grid grid-cols-2">
+      <div className="pr-8">
+        {en && <SectionBlock id={enId} text={en} className={extraClass} />}
+      </div>
+      <div className="border-l border-border/20 pl-8">
+        {la && <SectionBlock text={la} className={extraClass} />}
+      </div>
+    </div>
+  );
+}
+
+function SideBySideArticleView({ article }: { article: Article }) {
+  const maxObjs    = Math.max(article.objections.length,    article.objections_la.length);
+  const maxReplies = Math.max(article.replies.length,       article.replies_la.length);
+  const hasSC      = article.sed_contra   || article.sed_contra_la;
+  const hasResp    = article.respondeo    || article.respondeo_la;
+
+  return (
+    <div>
+      {/* Objections — one row per pair */}
+      <div className="space-y-9">
+        {Array.from({ length: maxObjs }, (_, i) => {
+          const en = article.objections[i];
+          const la = article.objections_la[i];
+          return (
+            <SectionPairRow
+              key={`obj-${i}`}
+              en={en?.text ?? null}
+              la={la?.text ?? null}
+              enId={en ? `objection-${en.n}` : undefined}
+            />
+          );
+        })}
+      </div>
+
+      {hasSC && (
+        <>
+          <div className="my-9 h-px bg-border/25" />
+          <SectionPairRow
+            en={article.sed_contra ?? null}
+            la={article.sed_contra_la ?? null}
+            enId="sed-contra"
+          />
+        </>
+      )}
+
+      {hasResp && (
+        <>
+          <div className="my-9 h-px bg-border/25" />
+          <SectionPairRow
+            en={article.respondeo ?? null}
+            la={article.respondeo_la ?? null}
+            enId="respondeo"
+            respondeoStyle
+          />
+        </>
+      )}
+
+      {maxReplies > 0 && (
+        <>
+          <div className="my-9 h-px bg-border/25" />
+          <div className="space-y-9">
+            {Array.from({ length: maxReplies }, (_, i) => {
+              const en = article.replies[i];
+              const la = article.replies_la[i];
+              return (
+                <SectionPairRow
+                  key={`rep-${i}`}
+                  en={en?.text ?? null}
+                  la={la?.text ?? null}
+                  enId={en ? `reply-${en.n}` : undefined}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ArticleView({ article, lang }: { article: Article; lang: LangMode }) {
+  if (lang !== "both") {
+    return (
+      <div className="max-w-prose">
+        <ArticleColumn article={article} lang={lang} withIds={lang === "en"} />
+      </div>
+    );
+  }
+
+  return <SideBySideArticleView article={article} />;
 }
 
 // ── Question index (article list when a question is selected) ─────────────────
@@ -339,6 +482,7 @@ export default function ContentViewer({
 }) {
   const router = useRouter();
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
+  const [lang, setLang] = useState<LangMode>("both");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { prev: prevNode, next: nextNode } = selected
@@ -501,30 +645,48 @@ export default function ContentViewer({
             {renderHeader()}
           </div>
           {isArticleMode && (
-            <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-              <button
-                onClick={() => prevNode && router.push(articleUrl(prevNode))}
-                disabled={!prevNode}
-                title={prevNode ? `${prevNode.partAbbr} Q.${prevNode.questionN} A.${prevNode.articleN}` : undefined}
-                className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => nextNode && router.push(articleUrl(nextNode))}
-                disabled={!nextNode}
-                title={nextNode ? `${nextNode.partAbbr} Q.${nextNode.questionN} A.${nextNode.articleN}` : undefined}
-                className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              <div className="flex border border-border/30 rounded overflow-hidden">
+                {(["en", "both", "la"] as const).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLang(l)}
+                    className={cn(
+                      "font-mono text-[8px] tracking-wider px-1.5 py-[3px] transition-colors",
+                      lang === l
+                        ? "bg-foreground/[0.07] text-foreground/60"
+                        : "text-muted-foreground/25 hover:text-muted-foreground/50"
+                    )}
+                  >
+                    {l === "both" ? "EN·LA" : l.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => prevNode && router.push(articleUrl(prevNode))}
+                  disabled={!prevNode}
+                  title={prevNode ? `${prevNode.partAbbr} Q.${prevNode.questionN} A.${prevNode.articleN}` : undefined}
+                  className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => nextNode && router.push(articleUrl(nextNode))}
+                  disabled={!nextNode}
+                  title={nextNode ? `${nextNode.partAbbr} Q.${nextNode.questionN} A.${nextNode.articleN}` : undefined}
+                  className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-7 py-7">
-        <div className="max-w-prose mx-auto">
+        <div className={cn("mx-auto", lang === "both" ? "w-full" : "max-w-prose")}>
           {isLoading && (
             <div className="flex items-center gap-2.5 text-muted-foreground py-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -543,7 +705,7 @@ export default function ContentViewer({
           )}
 
           {!isLoading && !error && isArticleMode && article && (
-            <ArticleView article={article} />
+            <ArticleView article={article} lang={lang} />
           )}
 
           {!isLoading && !error && isQuestionMode && selected && (

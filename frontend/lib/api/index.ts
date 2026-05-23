@@ -17,6 +17,12 @@ export interface Article {
   objections: SectionItem[];
   replies: SectionItem[];
   source_url: string | null;
+  body_la: string | null;
+  sed_contra_la: string | null;
+  respondeo_la: string | null;
+  objections_la: SectionItem[];
+  replies_la: SectionItem[];
+  source_url_la: string | null;
 }
 
 export interface Passage {
