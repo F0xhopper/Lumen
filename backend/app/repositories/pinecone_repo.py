@@ -1,16 +1,16 @@
 """Wraps Pinecone Index API — services never touch the raw Pinecone client shape."""
 
 import asyncio
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, Field
 
 from app.core.config import settings
 
 
-@dataclass
-class PineconeMatch:
+class PineconeMatch(BaseModel):
     text: str
     score: float
-    metadata: dict = field(default_factory=dict)
+    metadata: dict = Field(default_factory=dict)
 
 
 class PineconeRepository:

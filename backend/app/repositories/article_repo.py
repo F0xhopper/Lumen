@@ -262,14 +262,14 @@ async def upsert_article(
     body: str,
     sed_contra: str | None,
     respondeo: str | None,
-    objections: list[dict],
-    replies: list[dict],
+    objections: list[SectionItem],
+    replies: list[SectionItem],
     source_url: str | None,
     body_la: str | None = None,
     sed_contra_la: str | None = None,
     respondeo_la: str | None = None,
-    objections_la: list[dict] | None = None,
-    replies_la: list[dict] | None = None,
+    objections_la: list[SectionItem] | None = None,
+    replies_la: list[SectionItem] | None = None,
     source_url_la: str | None = None,
 ):
     pool = get_db_pool()
@@ -299,9 +299,13 @@ async def upsert_article(
             part_id, part_abbr, question_n, question_title,
             article_n, article_title, body,
             sed_contra, respondeo,
-            json.dumps(objections), json.dumps(replies), source_url,
+            json.dumps([i.model_dump() for i in objections]),
+            json.dumps([i.model_dump() for i in replies]),
+            source_url,
             body_la, sed_contra_la, respondeo_la,
-            json.dumps(objections_la or []), json.dumps(replies_la or []), source_url_la,
+            json.dumps([i.model_dump() for i in (objections_la or [])]),
+            json.dumps([i.model_dump() for i in (replies_la or [])]),
+            source_url_la,
         )
 
 
@@ -312,8 +316,8 @@ async def upsert_latin(
     body_la: str | None,
     sed_contra_la: str | None,
     respondeo_la: str | None,
-    objections_la: list[dict],
-    replies_la: list[dict],
+    objections_la: list[SectionItem],
+    replies_la: list[SectionItem],
     source_url_la: str | None,
 ):
     """Update only the Latin fields for an existing article."""
@@ -332,5 +336,7 @@ async def upsert_latin(
             """,
             part_id, question_n, article_n,
             body_la, sed_contra_la, respondeo_la,
-            json.dumps(objections_la), json.dumps(replies_la), source_url_la,
+            json.dumps([i.model_dump() for i in objections_la]),
+            json.dumps([i.model_dump() for i in replies_la]),
+            source_url_la,
         )

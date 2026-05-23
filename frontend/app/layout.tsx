@@ -14,13 +14,22 @@ const cardo = Cardo({
 });
 
 export const metadata: Metadata = {
-  title: "Lumen — Summa Theologica",
-  description: "Study the Summa Theologica of St. Thomas Aquinas with AI-powered search and retrieval",
+  title: "Lumen",
+  description:
+    "Study the Summa Theologica of St. Thomas Aquinas with AI-powered search and retrieval",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`${inter.variable} ${cardo.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${cardo.variable}`}
+      suppressHydrationWarning
+    >
       <body className={`${inter.className} antialiased`}>
         <QueryProvider>
           <ThemeProvider>{children}</ThemeProvider>
