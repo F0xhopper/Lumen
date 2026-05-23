@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.repositories.article_repo import get_articles_for_question
+from app.core.dependencies import get_article_repo
+from app.models.schemas import ArticleSummary
+from app.repositories.article_repo import ArticleRepository
 
 router = APIRouter()
 
 
-@router.get("/articles")
+@router.get("/articles", response_model=list[ArticleSummary])
 async def list_articles(
     part_id: str = Query(...),
     question_n: int = Query(..., ge=1),
+    repo: ArticleRepository = Depends(get_article_repo),
 ):
-    rows = await get_articles_for_question(part_id, question_n)
-    return [{"article_n": r["article_n"], "article_title": r["article_title"]} for r in rows]
+    return await repo.get_articles_for_question(part_id, question_n)

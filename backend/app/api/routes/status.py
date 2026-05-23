@@ -11,10 +11,9 @@ async def health():
 
     try:
         pool = get_db_pool()
-        if pool:
-            async with pool.acquire() as conn:
-                await conn.fetchval("SELECT 1")
-            db_ok = True
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+        db_ok = True
     except Exception:
         pass
 

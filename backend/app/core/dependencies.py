@@ -1,4 +1,4 @@
-"""Shared client instances — created once at startup."""
+"""Shared client singletons — created once at lifespan startup, exposed as FastAPI dependencies."""
 
 import asyncpg
 from openai import AsyncOpenAI
@@ -23,6 +23,8 @@ async def close_db():
 
 
 def get_db_pool() -> asyncpg.Pool:
+    if _db_pool is None:
+        raise RuntimeError("Database pool not initialised — server is starting up or failed to start.")
     return _db_pool
 
 
@@ -39,3 +41,15 @@ def get_pinecone_index():
         pc = Pinecone(api_key=settings.PINECONE_API_KEY)
         _pinecone_index = pc.Index(settings.PINECONE_INDEX_NAME)
     return _pinecone_index
+
+
+# --- FastAPI dependency providers ---
+
+def get_article_repo():
+    from app.repositories.article_repo import ArticleRepository
+    return ArticleRepository(get_db_pool())
+
+
+def get_pinecone_repo():
+    from app.repositories.pinecone_repo import PineconeRepository
+    return PineconeRepository(get_pinecone_index())

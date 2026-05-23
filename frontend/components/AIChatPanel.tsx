@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Send, Loader2, RotateCcw, PanelRightClose } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
+import { postQuery } from "@/lib/api";
 import type { SelectedNode } from "@/lib/summa-full";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +26,6 @@ function buildQuery(input: string, selected: SelectedNode | null): string {
 export default function AIChatPanel({ selected, onCollapse }: { selected: SelectedNode | null; onCollapse: () => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -32,8 +33,35 @@ export default function AIChatPanel({ selected, onCollapse }: { selected: Select
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const send = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
+  const mutation = useMutation({
+    mutationFn: (query: string) => postQuery(query),
+    onSuccess: (data) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: data.answer ?? "No response returned.",
+        },
+      ]);
+    },
+    onError: () => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: "Request failed. Is the backend running?",
+        },
+      ]);
+    },
+    onSettled: () => {
+      inputRef.current?.focus();
+    },
+  });
+
+  const send = useCallback(() => {
+    if (!input.trim() || mutation.isPending) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -44,39 +72,8 @@ export default function AIChatPanel({ selected, onCollapse }: { selected: Select
     setMessages((prev) => [...prev, userMsg]);
     const query = buildQuery(input.trim(), selected);
     setInput("");
-    setIsLoading(true);
-
-    try {
-      const res = await fetch("/api/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
-      });
-
-      const data = res.ok ? await res.json() : null;
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data?.answer ?? "No response returned.",
-        },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "Request failed. Is the backend running?",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
-    }
-  }, [input, isLoading, selected]);
+    mutation.mutate(query);
+  }, [input, mutation, selected]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -166,7 +163,7 @@ export default function AIChatPanel({ selected, onCollapse }: { selected: Select
           </div>
         ))}
 
-        {isLoading && (
+        {mutation.isPending && (
           <div className="flex items-center gap-2 text-muted-foreground/50">
             <Loader2 className="h-3 w-3 animate-spin" />
             <span className="text-[9px] tracking-wider">Thinking…</span>
@@ -191,11 +188,11 @@ export default function AIChatPanel({ selected, onCollapse }: { selected: Select
               "placeholder:text-muted-foreground/40 leading-relaxed",
               "focus:outline-none focus:border-foreground/20 transition-colors"
             )}
-            disabled={isLoading}
+            disabled={mutation.isPending}
           />
           <button
             onClick={send}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || mutation.isPending}
             className="shrink-0 p-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
           >
             <Send className="h-3 w-3" />

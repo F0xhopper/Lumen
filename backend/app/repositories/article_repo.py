@@ -4,6 +4,7 @@ import json
 import asyncpg
 
 from app.core.dependencies import get_db_pool
+from app.models.schemas import ArticleResponse, ArticleSummary, PassageResult, SectionItem
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS summa_articles (
@@ -47,6 +48,148 @@ _TRGM_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_summa_body_trgm        ON summa_articles USING gin (body       gin_trgm_ops)",
 ]
 
+_ILIKE_SQL = """
+    SELECT part_id, part_abbr, question_n, question_title,
+           article_n, article_title, source_url,
+           sed_contra          AS text,
+           'sed_contra'        AS section,
+           'On the contrary'   AS section_label,
+           'sed-contra'        AS url_fragment
+    FROM summa_articles
+    WHERE sed_contra ILIKE $1 ESCAPE '!'
+
+    UNION ALL
+
+    SELECT part_id, part_abbr, question_n, question_title,
+           article_n, article_title, source_url,
+           respondeo       AS text,
+           'respondeo'     AS section,
+           'I answer that' AS section_label,
+           'respondeo'     AS url_fragment
+    FROM summa_articles
+    WHERE respondeo ILIKE $1 ESCAPE '!'
+
+    UNION ALL
+
+    SELECT a.part_id, a.part_abbr, a.question_n, a.question_title,
+           a.article_n, a.article_title, a.source_url,
+           obj->>'text'                        AS text,
+           'objection_' || (obj->>'n')         AS section,
+           'Objection ' || (obj->>'n')         AS section_label,
+           'objection-' || (obj->>'n')         AS url_fragment
+    FROM summa_articles a, jsonb_array_elements(a.objections) AS obj
+    WHERE obj->>'text' ILIKE $1 ESCAPE '!'
+
+    UNION ALL
+
+    SELECT a.part_id, a.part_abbr, a.question_n, a.question_title,
+           a.article_n, a.article_title, a.source_url,
+           rep->>'text'                              AS text,
+           'reply_' || (rep->>'n')                  AS section,
+           'Reply to Objection ' || (rep->>'n')     AS section_label,
+           'reply-' || (rep->>'n')                  AS url_fragment
+    FROM summa_articles a, jsonb_array_elements(a.replies) AS rep
+    WHERE rep->>'text' ILIKE $1 ESCAPE '!'
+
+    ORDER BY question_n, article_n
+    LIMIT $2
+"""
+
+_PART_TO_SLUG = {
+    "prima-pars": "1",
+    "prima-secundae": "1-2",
+    "secunda-secundae": "2-2",
+    "tertia-pars": "3",
+}
+
+
+def _parse_section_items(raw) -> list[SectionItem]:
+    if isinstance(raw, str):
+        items = json.loads(raw)
+    elif isinstance(raw, list):
+        items = raw
+    else:
+        return []
+    return [SectionItem(**item) for item in items]
+
+
+# ---------------------------------------------------------------------------
+# Repository class — used by routes via FastAPI Depends()
+# ---------------------------------------------------------------------------
+
+class ArticleRepository:
+    def __init__(self, pool: asyncpg.Pool):
+        self._pool = pool
+
+    async def get_article(
+        self, part_id: str, question_n: int, article_n: int
+    ) -> ArticleResponse | None:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT part_id, part_abbr, question_n, question_title,
+                       article_n, article_title, body,
+                       sed_contra, respondeo, objections, replies,
+                       source_url,
+                       body_la, sed_contra_la, respondeo_la,
+                       objections_la, replies_la, source_url_la
+                FROM summa_articles
+                WHERE part_id = $1 AND question_n = $2 AND article_n = $3
+                """,
+                part_id, question_n, article_n,
+            )
+        if not row:
+            return None
+        d = dict(row)
+        for field in ("objections", "replies", "objections_la", "replies_la"):
+            d[field] = _parse_section_items(d.get(field))
+        return ArticleResponse(**d)
+
+    async def get_articles_for_question(
+        self, part_id: str, question_n: int
+    ) -> list[ArticleSummary]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT article_n, article_title
+                FROM summa_articles
+                WHERE part_id = $1 AND question_n = $2
+                ORDER BY article_n
+                """,
+                part_id, question_n,
+            )
+        return [ArticleSummary(article_n=r["article_n"], article_title=r["article_title"]) for r in rows]
+
+    async def ilike_search(self, query: str, limit: int = 8) -> list[PassageResult]:
+        """Keyword search across all text sections; score placeholder filled by reranker."""
+        safe = query.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+        pattern = f"%{safe}%"
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(_ILIKE_SQL, pattern, limit)
+        results = []
+        for r in rows:
+            slug = _PART_TO_SLUG.get(r["part_id"], r["part_id"])
+            results.append(PassageResult(
+                rank=0,
+                text=r["text"] or "",
+                score=0.0,
+                part_abbr=r["part_abbr"],
+                question_n=r["question_n"],
+                article_n=r["article_n"],
+                question_title=r["question_title"],
+                article_title=r["article_title"],
+                section=r["section"],
+                section_label=r["section_label"],
+                url_fragment=r["url_fragment"],
+                article_url=f"/{slug}/{r['question_n']}/{r['article_n']}",
+                source_url=r["source_url"] or "",
+            ))
+        return results
+
+
+# ---------------------------------------------------------------------------
+# Module-level functions — used by lifespan and data pipeline scripts
+# ---------------------------------------------------------------------------
 
 async def ensure_schema():
     pool = get_db_pool()
@@ -61,38 +204,6 @@ async def ensure_schema():
             logging.getLogger(__name__).warning(
                 "Could not create pg_trgm indexes (%s) — ILIKE search will be slower.", e
             )
-
-
-async def get_articles_for_question(part_id: str, question_n: int) -> list[asyncpg.Record]:
-    pool = get_db_pool()
-    async with pool.acquire() as conn:
-        return await conn.fetch(
-            """
-            SELECT article_n, article_title
-            FROM summa_articles
-            WHERE part_id = $1 AND question_n = $2
-            ORDER BY article_n
-            """,
-            part_id, question_n,
-        )
-
-
-async def get_article(part_id: str, question_n: int, article_n: int) -> asyncpg.Record | None:
-    pool = get_db_pool()
-    async with pool.acquire() as conn:
-        return await conn.fetchrow(
-            """
-            SELECT part_id, part_abbr, question_n, question_title,
-                   article_n, article_title, body,
-                   sed_contra, respondeo, objections, replies,
-                   source_url,
-                   body_la, sed_contra_la, respondeo_la,
-                   objections_la, replies_la, source_url_la
-            FROM summa_articles
-            WHERE part_id = $1 AND question_n = $2 AND article_n = $3
-            """,
-            part_id, question_n, article_n,
-        )
 
 
 async def get_all_for_indexing() -> list[asyncpg.Record]:
@@ -117,65 +228,6 @@ async def mark_indexed(article_ids: list[int]):
         await conn.execute(
             "UPDATE summa_articles SET pinecone_indexed = TRUE WHERE id = ANY($1)",
             article_ids,
-        )
-
-
-async def ilike_search(query: str, limit: int = 8) -> list[asyncpg.Record]:
-    """Return one row per matching section (same granularity as Pinecone vectors)."""
-    pool = get_db_pool()
-    # Escape the ILIKE metacharacters so user input is treated as a literal string.
-    # '!' is our escape character; it must be escaped first to avoid double-escaping.
-    safe = query.replace("!", "!!").replace("%", "!%").replace("_", "!_")
-    pattern = f"%{safe}%"
-    async with pool.acquire() as conn:
-        return await conn.fetch(
-            """
-            SELECT part_id, part_abbr, question_n, question_title,
-                   article_n, article_title, source_url,
-                   sed_contra          AS text,
-                   'sed_contra'        AS section,
-                   'On the contrary'   AS section_label,
-                   'sed-contra'        AS url_fragment
-            FROM summa_articles
-            WHERE sed_contra ILIKE $1 ESCAPE '!'
-
-            UNION ALL
-
-            SELECT part_id, part_abbr, question_n, question_title,
-                   article_n, article_title, source_url,
-                   respondeo       AS text,
-                   'respondeo'     AS section,
-                   'I answer that' AS section_label,
-                   'respondeo'     AS url_fragment
-            FROM summa_articles
-            WHERE respondeo ILIKE $1 ESCAPE '!'
-
-            UNION ALL
-
-            SELECT a.part_id, a.part_abbr, a.question_n, a.question_title,
-                   a.article_n, a.article_title, a.source_url,
-                   obj->>'text'                        AS text,
-                   'objection_' || (obj->>'n')         AS section,
-                   'Objection ' || (obj->>'n')         AS section_label,
-                   'objection-' || (obj->>'n')         AS url_fragment
-            FROM summa_articles a, jsonb_array_elements(a.objections) AS obj
-            WHERE obj->>'text' ILIKE $1 ESCAPE '!'
-
-            UNION ALL
-
-            SELECT a.part_id, a.part_abbr, a.question_n, a.question_title,
-                   a.article_n, a.article_title, a.source_url,
-                   rep->>'text'                              AS text,
-                   'reply_' || (rep->>'n')                  AS section,
-                   'Reply to Objection ' || (rep->>'n')     AS section_label,
-                   'reply-' || (rep->>'n')                  AS url_fragment
-            FROM summa_articles a, jsonb_array_elements(a.replies) AS rep
-            WHERE rep->>'text' ILIKE $1 ESCAPE '!'
-
-            ORDER BY question_n, article_n
-            LIMIT $2
-            """,
-            pattern, limit,
         )
 
 

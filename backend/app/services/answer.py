@@ -3,8 +3,8 @@
 from openai import AsyncOpenAI
 
 from app.core.config import settings
-from app.core.dependencies import get_openai
 from app.core.logging import get_logger
+from app.models.schemas import PassageResult
 
 logger = get_logger(__name__)
 
@@ -40,16 +40,18 @@ RESPONSE STYLE:
 - Objections and replies show the dialectical method"""
 
 
-def _format_context(passages: list[dict]) -> str:
+def _format_context(passages: list[PassageResult]) -> str:
     lines = []
     for p in passages:
-        loc = f"ST {p['part_abbr']} Q.{p['question_n']} A.{p['article_n']} — {p['section_label']}"
-        link = f"{p.get('article_url', '')}#{p.get('url_fragment', '')}"
-        lines.append(f"[{loc}] (link: {link})\n{p['text']}")
+        loc = f"ST {p.part_abbr} Q.{p.question_n} A.{p.article_n} — {p.section_label}"
+        link = f"{p.article_url}#{p.url_fragment}"
+        lines.append(f"[{loc}] (link: {link})\n{p.text}")
     return "\n\n---\n\n".join(lines)
 
 
-async def generate_answer(query: str, passages: list[dict]) -> str:
+async def generate_answer(
+    query: str, passages: list[PassageResult], client: AsyncOpenAI
+) -> str:
     if not passages:
         return "No relevant passages found. Try rephrasing or ask about a specific Question and Article."
 
@@ -59,12 +61,11 @@ async def generate_answer(query: str, passages: list[dict]) -> str:
         f"\n\n---\n\nQuestion: {query}"
     )
 
-    client: AsyncOpenAI = get_openai()
     response = await client.chat.completions.create(
         model=settings.CHAT_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_message},
+            {"role": "user", "content": user_message},
         ],
         temperature=0.2,
         max_tokens=1500,

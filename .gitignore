@@ -76,6 +76,7 @@ temp_docs/
 
 # Models & embeddings
 models/
+!backend/app/models/
 embeddings/
 *.pkl
 *.pickle

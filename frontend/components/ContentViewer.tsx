@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Bookmark, Search, MessageSquare } from "lucide-react";
 import { getAdjacentArticles, type SelectedNode } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
+import { fetchArticle, fetchPassages, type Article, type Passage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const PART_TO_SLUG: Record<string, string> = {
@@ -25,41 +27,6 @@ const ABBR_TO_PART_ID: Record<string, string> = {
 function articleUrl(node: SelectedNode): string {
   return `/${PART_TO_SLUG[node.partId]}/${node.questionN}/${node.articleN}`;
 }
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface SectionItem { n: number; text: string }
-
-interface Article {
-  part_abbr: string;
-  question_n: number;
-  question_title: string;
-  article_n: number;
-  article_title: string;
-  body: string;
-  sed_contra: string | null;
-  respondeo: string | null;
-  objections: SectionItem[];
-  replies: SectionItem[];
-  source_url: string | null;
-}
-
-interface Passage {
-  rank: number;
-  text: string;
-  score: number;
-  part_abbr: string;
-  question_n: number;
-  article_n: number;
-  question_title: string;
-  article_title: string;
-  section: string;
-  section_label: string;
-  url_fragment: string;
-  article_url: string;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 // ── Article view (structured sections with anchors) ────────────────────────────
 
@@ -371,10 +338,6 @@ export default function ContentViewer({
   onHighlightAddToChat?: (text: string) => void;
 }) {
   const router = useRouter();
-  const [article, setArticle] = useState<Article | null>(null);
-  const [passages, setPassages] = useState<Passage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -382,11 +345,45 @@ export default function ContentViewer({
     ? getAdjacentArticles(selected)
     : { prev: null, next: null };
 
-  const isArticleMode = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
-  const isSearchMode  = Boolean(searchQuery.trim());
+  const isArticleMode  = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
+  const isSearchMode   = Boolean(searchQuery.trim());
   const isQuestionMode = Boolean(selected && selected.articleN === undefined && !searchQuery.trim());
 
-  // Show highlight menu on text selection inside the scroll container
+  const resolvedPartId = selected
+    ? (ABBR_TO_PART_ID[selected.partAbbr] ?? selected.partId)
+    : "";
+
+  // ── Article query ────────────────────────────────────────────────────────────
+  const {
+    data: article,
+    isLoading: articleLoading,
+    error: articleError,
+  } = useQuery({
+    queryKey: ["article", resolvedPartId, selected?.questionN, selected?.articleN],
+    queryFn: () => fetchArticle(resolvedPartId, selected!.questionN, selected!.articleN!),
+    enabled: isArticleMode && !!selected,
+    staleTime: Infinity, // articles are static — never re-fetch
+    retry: 1,
+  });
+
+  // ── Passages query ───────────────────────────────────────────────────────────
+  const trimmedQuery = searchQuery.trim();
+  const {
+    data: passages = [],
+    isLoading: passagesLoading,
+    error: passagesError,
+  } = useQuery({
+    queryKey: ["passages", trimmedQuery],
+    queryFn: () => fetchPassages(trimmedQuery),
+    enabled: isSearchMode,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const isLoading = articleLoading || passagesLoading;
+  const error = articleError || passagesError;
+
+  // ── Highlight menu ───────────────────────────────────────────────────────────
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
       const sel = window.getSelection();
@@ -413,7 +410,7 @@ export default function ContentViewer({
     };
   }, []);
 
-  // Dismiss on scroll
+  // Dismiss highlight on scroll
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -436,47 +433,6 @@ export default function ContentViewer({
       document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
   }, [article]);
-
-  // Fetch structured article when article is selected
-  useEffect(() => {
-    if (!isArticleMode || !selected) {
-      setArticle(null);
-      return;
-    }
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-
-    const partId = ABBR_TO_PART_ID[selected.partAbbr] ?? selected.partId;
-
-    fetch(`/api/article?part_id=${partId}&question_n=${selected.questionN}&article_n=${selected.articleN}`)
-      .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
-      .then((data) => { if (!cancelled) { setArticle(data); setIsLoading(false); } })
-      .catch(() => {
-        if (!cancelled) { setError("Could not load article. Is the backend running?"); setIsLoading(false); }
-      });
-
-    return () => { cancelled = true; };
-  }, [isArticleMode, selected?.partId, selected?.questionN, selected?.articleN]);
-
-  // Fetch passages for search mode only
-  useEffect(() => {
-    if (!isSearchMode || !searchQuery.trim()) { setPassages([]); setError(null); setIsLoading(false); return; }
-
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-    setPassages([]);
-
-    fetch(`/api/passages?query=${encodeURIComponent(searchQuery.trim())}&top_k=8`)
-      .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
-      .then((data) => { if (!cancelled) { setPassages(Array.isArray(data) ? data : []); setIsLoading(false); } })
-      .catch(() => {
-        if (!cancelled) { setError("Could not retrieve passages. Is the backend running?"); setIsLoading(false); }
-      });
-
-    return () => { cancelled = true; };
-  }, [isSearchMode, searchQuery]);
 
   // ── Welcome ──────────────────────────────────────────────────────────────────
   if (!selected && !searchQuery) {
@@ -580,7 +536,9 @@ export default function ContentViewer({
 
           {error && (
             <p className="font-inter text-[11px] text-muted-foreground border border-border rounded p-4">
-              {error}
+              {isArticleMode
+                ? "Could not load article. Is the backend running?"
+                : "Could not retrieve passages. Is the backend running?"}
             </p>
           )}
 
