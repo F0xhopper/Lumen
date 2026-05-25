@@ -40,8 +40,46 @@ export interface Passage {
   article_url: string;
 }
 
+export interface CitationResult {
+  ref: string;
+  part_abbr: string;
+  question_n: number;
+  article_n: number;
+  section: string;
+  section_label: string;
+  article_title: string;
+  question_title: string;
+  url_path: string; // e.g. "/1/2/3#respondeo"
+}
+
+export interface PinnedSection {
+  part_abbr: string;
+  question_n: number;
+  article_n: number;
+  section: string;
+  section_label: string;
+  article_title: string;
+  question_title: string;
+  url_path: string;
+  text: string;
+}
+
+export interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface QueryRequest {
+  query: string;
+  pinned_sections?: PinnedSection[];
+  conversation_history?: ConversationTurn[];
+}
+
 export interface QueryResponse {
   answer: string;
+  citations: CitationResult[];
+  passages_used: number;
+  agent_steps: number;
 }
 
 export async function fetchArticle(
@@ -65,12 +103,56 @@ export async function fetchPassages(query: string, topK = 8): Promise<Passage[]>
   return Array.isArray(data) ? data : [];
 }
 
-export async function postQuery(query: string): Promise<QueryResponse> {
+export async function postQuery(req: QueryRequest): Promise<QueryResponse> {
   const res = await fetch("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify(req),
   });
   if (!res.ok) throw new Error(`${res.status}`);
-  return res.json();
+  const data = await res.json();
+  // Normalise: backend always returns citations[], but guard against old shape
+  return {
+    answer: data.answer ?? "",
+    citations: data.citations ?? [],
+    passages_used: data.passages_used ?? 0,
+    agent_steps: data.agent_steps ?? 1,
+  };
+}
+
+// Server-Sent Events streaming query
+export type StreamEvent =
+  | { type: "status"; message: string }
+  | { type: "token"; text: string }
+  | { type: "done"; citations: CitationResult[]; passages_used: number; agent_steps: number }
+  | { type: "error"; message: string };
+
+export async function* streamQuery(req: QueryRequest): AsyncGenerator<StreamEvent> {
+  const res = await fetch("/api/query/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok || !res.body) throw new Error(`${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          yield JSON.parse(line.slice(6)) as StreamEvent;
+        } catch {
+          // malformed SSE line — skip
+        }
+      }
+    }
+  }
 }

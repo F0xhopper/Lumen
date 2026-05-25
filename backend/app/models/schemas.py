@@ -48,10 +48,43 @@ class ArticleSummary(BaseModel):
     article_title: str
 
 
+class CitationResult(BaseModel):
+    ref: str           # "1", "2", ... matches [[1]] in answer text
+    part_abbr: str
+    question_n: int
+    article_n: int
+    section: str
+    section_label: str
+    article_title: str
+    question_title: str
+    url_path: str      # e.g. "/1/2/3#respondeo" — used by frontend for navigation
+
+
+class PinnedSection(BaseModel):
+    part_abbr: str
+    question_n: int
+    article_n: int
+    section: str
+    section_label: str
+    article_title: str
+    question_title: str
+    url_path: str
+    text: str
+
+
+class ConversationTurn(BaseModel):
+    role: str    # "user" | "assistant"
+    content: str
+
+
 class QueryRequest(BaseModel):
     query: str
+    pinned_sections: list[PinnedSection] = []
+    conversation_history: list[ConversationTurn] = []
 
 
 class QueryResponse(BaseModel):
     answer: str
+    citations: list[CitationResult] = []
     passages_used: int
+    agent_steps: int = 1
