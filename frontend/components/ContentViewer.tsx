@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Bookmark, Search, MessageSquare } from "lucide-react";
 import { getAdjacentArticles, type SelectedNode } from "@/lib/summa-full";
+import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { fetchArticle, fetchPassages, type Article, type Passage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -81,9 +82,12 @@ function rubricClass(label: string): string {
 function renderWithBoldLabel(text: string): React.ReactNode {
   const m = LABEL_RE.exec(text);
   const body = m ? text.slice(m[0].length) : text;
+  if (!m) return renderWithQuotes(body);
+  const trailingPunct = m[1].match(/[,.]$/)?.[0] ?? "";
+  const labelText = trailingPunct ? m[1].slice(0, -1) : m[1];
   return (
     <>
-      {m && <><span className={rubricClass(m[1])}>{m[1]}</span>{" "}</>}
+      <span className={rubricClass(m[1])}>{labelText}</span>{trailingPunct}{" "}
       {renderWithQuotes(body)}
     </>
   );
@@ -317,42 +321,29 @@ function sectionLabelClass(label: string): string {
 
 function PassageList({ passages, searchQuery }: { passages: Passage[]; searchQuery: string }) {
   return (
-    <div className="space-y-8 max-w-prose">
+    <div className="space-y-8">
       {passages.map((p) => {
         const href = p.article_url
           ? `${p.article_url}#${p.url_fragment}`
           : null;
-        const loc = `${p.part_abbr} Q.${p.question_n} A.${p.article_n}`;
+        const loc = `${p.part_abbr}  Q.${p.question_n} A.${p.article_n}`;
 
         const card = (
           <>
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-[9px] font-mono text-muted-foreground/30">[{p.rank}]</span>
-              <span className="font-inter text-[9px] tracking-wide text-muted-foreground/50">{loc}</span>
-            </div>
-
-            <div className="h-px bg-border/30 mb-3" />
-
-            <div className="mb-3">
-              <p className="font-cardo text-[13.5px] text-foreground/60 leading-snug">
-                {p.question_title}
-              </p>
+            <p className="font-inter text-[11px] tracking-wide text-muted-foreground/45 mb-3">
+              {loc}
               {p.article_title && (
-                <p className="font-cardo italic text-[12px] text-muted-foreground/45 leading-snug mt-0.5">
-                  {p.article_title}
-                </p>
+                <>
+                  <span className="mx-2 text-muted-foreground/25">·</span>
+                  <span className="font-cardo italic text-[13px]">{p.article_title}</span>
+                </>
               )}
-            </div>
-
-            {p.section_label && (
-              <p className={cn("font-inter text-[9px] tracking-widest uppercase mb-2", sectionLabelClass(p.section_label))}>
-                {p.section_label}
-              </p>
-            )}
+            </p>
 
             <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/80 whitespace-pre-wrap">
               {highlightTerms(p.text, searchQuery)}
             </p>
+
           </>
         );
 
@@ -360,7 +351,7 @@ function PassageList({ passages, searchQuery }: { passages: Passage[]; searchQue
           <Link
             key={p.rank}
             href={href}
-            className="block -mx-3 px-3 py-2 rounded transition-colors hover:bg-foreground/[0.025]"
+            className="block -mx-3 px-3 py-3 rounded transition-colors hover:bg-foreground/[0.025]"
           >
             {card}
           </Link>
@@ -424,10 +415,10 @@ function HighlightMenu({
         <button
           key={label}
           onClick={onClick}
-          className="flex-1 flex flex-col items-center justify-center gap-[3px] py-[7px] text-muted-foreground/40 hover:text-foreground/80 hover:bg-foreground/[0.035] transition-colors"
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-muted-foreground/40 hover:text-foreground/80 hover:bg-foreground/[0.035] transition-colors"
         >
-          <Icon className="h-[11px] w-[11px]" />
-          <span className="font-inter text-[6.5px] tracking-[0.12em] uppercase leading-none">{label}</span>
+          <Icon className="h-3.5 w-3.5" />
+          <span className="font-inter text-[10px] tracking-[0.10em] uppercase leading-none">{label}</span>
         </button>
       ))}
     </div>
@@ -572,17 +563,17 @@ export default function ContentViewer({
     if (isSearchMode) return (
       <>
         <div className="flex items-center gap-2 mb-1">
-          <p className="font-inter text-[9px] tracking-widest uppercase text-muted-foreground/50">
+          <p className="font-inter text-[11px] tracking-widest uppercase text-muted-foreground/60">
             Search results
           </p>
           {!isLoading && passages.length > 0 && (
-            <span className="font-mono text-[9px] text-muted-foreground/30">{passages.length}</span>
+            <span className="font-mono text-[11px] text-muted-foreground/45">{passages.length}</span>
           )}
           {previousSelected && onBack && (
             <button
               onClick={onBack}
               title={`Back to ${previousSelected.partAbbr} Q.${previousSelected.questionN}${previousSelected.articleN !== undefined ? ` A.${previousSelected.articleN}` : ""}`}
-              className="flex items-center gap-0.5 font-inter text-[9px] tracking-wide text-muted-foreground/40 hover:text-foreground/70 transition-colors"
+              className="flex items-center gap-0.5 font-inter text-[11px] tracking-wide text-muted-foreground/40 hover:text-foreground/70 transition-colors"
             >
               <ChevronLeft className="h-2.5 w-2.5" />
               <span>
@@ -598,12 +589,13 @@ export default function ContentViewer({
     if (!selected) return null;
     return (
       <>
-        <p className="font-inter text-[9px] font-mono tracking-widest text-muted-foreground/50 mb-1.5">
-          {selected.partAbbr} · Q.{selected.questionN}
-          {selected.articleN !== undefined && ` · A.${selected.articleN}`}
+        <p className="font-mono text-[11px] text-muted-foreground/55 mb-2 tracking-wide">
+          {selected.partAbbr} · Q.{selected.questionN}{selected.articleN !== undefined && ` · A.${selected.articleN}`}
         </p>
-        <h1 className="font-cardo text-[16px] text-foreground/85 leading-snug">
-          {isArticleMode && article ? article.article_title : selected.questionTitle}
+        <h1 className="font-cardo text-[17px] text-foreground/90 leading-snug">
+          {selected.articleN !== undefined
+            ? (SUMMA_ARTICLE_TITLES[selected.partId]?.[selected.questionN]?.find((a) => a.n === selected.articleN)?.title ?? selected.questionTitle)
+            : selected.questionTitle}
         </h1>
       </>
     );
@@ -612,34 +604,35 @@ export default function ContentViewer({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="shrink-0 px-7 py-3.5 border-b border-border">
-        <div className="max-w-prose mx-auto flex items-start justify-between gap-4">
+        <div className={cn("mx-auto flex items-center justify-between gap-4", lang === "both" && !isSearchMode ? "w-full" : "max-w-prose")}>
           <div className="min-w-0">
             {renderHeader()}
           </div>
           {isArticleMode && (
-            <div className="flex items-center gap-2 shrink-0 mt-0.5">
-              <div className="flex border border-border/30 rounded overflow-hidden">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex border border-border/40 rounded overflow-hidden">
                 {(["en", "both", "la"] as const).map((l) => (
                   <button
                     key={l}
                     onClick={() => setLang(l)}
                     className={cn(
-                      "font-mono text-[8px] tracking-wider px-1.5 py-[3px] transition-colors",
+                      "font-inter text-[11px] px-3 py-2 transition-colors",
                       lang === l
-                        ? "bg-foreground/[0.07] text-foreground/60"
-                        : "text-muted-foreground/25 hover:text-muted-foreground/50"
+                        ? "bg-foreground/[0.07] text-foreground/70"
+                        : "text-muted-foreground/45 hover:text-muted-foreground/75"
                     )}
                   >
-                    {l === "both" ? "EN·LA" : l.toUpperCase()}
+                    {l === "en" ? "EN" : l === "la" ? "LA" : "EN · LA"}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-0.5">
+              <div className="w-px h-4 bg-border/40" />
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => prevNode && router.push(articleUrl(prevNode))}
                   disabled={!prevNode}
                   title={prevNode ? `${prevNode.partAbbr} Q.${prevNode.questionN} A.${prevNode.articleN}` : undefined}
-                  className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                  className="p-2.5 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
@@ -647,7 +640,7 @@ export default function ContentViewer({
                   onClick={() => nextNode && router.push(articleUrl(nextNode))}
                   disabled={!nextNode}
                   title={nextNode ? `${nextNode.partAbbr} Q.${nextNode.questionN} A.${nextNode.articleN}` : undefined}
-                  className="p-1 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                  className="p-2.5 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
@@ -658,11 +651,11 @@ export default function ContentViewer({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-7 py-7">
-        <div className={cn("mx-auto", lang === "both" ? "w-full" : "max-w-prose")}>
+        <div className={cn("mx-auto", lang === "both" && !isSearchMode ? "w-full" : "max-w-prose")}>
           {isLoading && (
             <div className="flex items-center gap-2.5 text-muted-foreground py-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span className="font-inter text-[9px] tracking-widest uppercase">
+              <span className="font-inter text-[11px] tracking-widest uppercase">
                 {isArticleMode ? "Loading article…" : "Retrieving passages…"}
               </span>
             </div>

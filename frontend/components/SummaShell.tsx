@@ -7,11 +7,15 @@ import {
   Search,
   X,
   PanelLeftOpen,
+  PanelLeftClose,
   PanelRightOpen,
   Sun,
   Moon,
   Menu,
   MessageSquare,
+  BookOpen,
+  Bookmark,
+  Clock,
 } from "lucide-react";
 import SummaTree from "@/components/SummaTree";
 import ContentViewer from "@/components/ContentViewer";
@@ -21,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 const LEFT_W = 258;
 const RIGHT_W = 300;
-const STRIP_W = 40;
+const STRIP_W = 0;
 
 const PART_SLUG: Record<string, string> = {
   "1": "prima-pars",
@@ -102,6 +106,7 @@ export default function SummaShell() {
   );
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "history">("browse");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -171,155 +176,162 @@ export default function SummaShell() {
   const rightW = rightOpen ? RIGHT_W : STRIP_W;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
-      {/* ── Global top bar ── */}
-      <header className="relative shrink-0 flex items-center border-b border-border px-2 py-2.5 z-10 bg-background">
-        {/* Left slot: branding on desktop, hamburger on mobile */}
-        {isMobile ? (
-          <button
-            onClick={() => {
-              setLeftOpen((o) => !o);
-              setRightOpen(false);
-            }}
-            title="Open navigation"
-            className="shrink-0 p-1.5 text-muted-foreground/50 hover:text-foreground transition-colors"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-        ) : (
-          <div
-            className="shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
-            style={{ width: leftW }}
-          >
-            {leftOpen && (
-              <div className="pl-3">
-                <p className="font-cardo italic text-[17px] text-foreground/85 leading-none">
-                  Lumen
-                </p>
-                <p className="text-[8.5px] text-muted-foreground tracking-[0.12em] mt-0.5 font-inter">
-                  Summa Theologica · St. Thomas Aquinas
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Search — centered on desktop, flex-1 on mobile */}
-        <form
-          onSubmit={handleSearch}
-          className={cn(
-            "flex items-center",
-            isMobile
-              ? "flex-1 mx-2"
-              : "absolute left-1/2 -translate-x-1/2 w-[420px] max-w-[44vw]",
-          )}
-        >
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/35 pointer-events-none" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search the Summa…"
-              className="w-full pl-8 pr-8 py-1.5 bg-secondary border border-border rounded text-[12px] font-cardo text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:border-foreground/25 transition-colors"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        </form>
-
-        {/* Right slot: chat button (mobile only) + theme toggle */}
-        <div
-          className={cn(
-            "shrink-0 flex items-center gap-0.5 pr-2",
-            !isMobile && "ml-auto",
-          )}
-          style={isMobile ? undefined : { width: rightW }}
-        >
-          {isMobile && (
-            <button
-              onClick={() => {
-                setRightOpen((o) => !o);
-                setLeftOpen(false);
-              }}
-              title="Open AI chat"
-              className="p-1.5 text-muted-foreground/50 hover:text-foreground transition-colors"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </button>
-          )}
-          <button
-            onClick={() =>
-              setTheme(resolvedTheme === "dark" ? "light" : "dark")
-            }
-            title="Toggle theme"
-            className="ml-auto p-1.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
-          >
-            {mounted &&
-              (resolvedTheme === "dark" ? (
-                <Sun className="h-3.5 w-3.5" />
-              ) : (
-                <Moon className="h-3.5 w-3.5" />
-              ))}
-          </button>
-        </div>
-      </header>
-
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Mobile drawer backdrop */}
       {isMobile && (leftOpen || rightOpen) && (
         <div
           className="fixed inset-0 z-40 bg-background/75"
-          onClick={() => {
-            setLeftOpen(false);
-            setRightOpen(false);
-          }}
+          onClick={() => { setLeftOpen(false); setRightOpen(false); }}
         />
       )}
 
-      {/* ── Three panels ── */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Left panel — drawer on mobile, fixed-width column on desktop */}
-        <aside
-          className={cn(
-            "shrink-0 border-r border-border flex flex-col overflow-hidden bg-background",
-            isMobile
-              ? cn(
-                  "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
-                  leftOpen ? "translate-x-0" : "-translate-x-full",
-                )
-              : "transition-[width] duration-200 ease-in-out",
-          )}
-          style={{ width: isMobile ? LEFT_W : leftW }}
-        >
-          {!isMobile && !leftOpen ? (
-            <div className="flex flex-col items-center pt-3 gap-3">
-              <button
-                onClick={() => setLeftOpen(true)}
-                title="Expand structure panel"
-                className="p-1.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
-              >
-                <PanelLeftOpen className="h-3.5 w-3.5" />
-              </button>
+      {/* ── Left sidebar — full height ── */}
+      <aside
+        className={cn(
+          "shrink-0 border-r border-border flex flex-col overflow-hidden bg-background",
+          isMobile
+            ? cn(
+                "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
+                leftOpen ? "translate-x-0" : "-translate-x-full",
+              )
+            : "transition-[width] duration-200 ease-in-out",
+        )}
+        style={{ width: isMobile ? LEFT_W : leftW }}
+      >
+        {(leftOpen || isMobile) && (
+          <>
+            {/* Branding */}
+            <div className="shrink-0 flex items-center px-4 h-12 border-b border-border">
+              <p className="font-cardo italic text-[17px] text-foreground/85 leading-none">Lumen</p>
             </div>
-          ) : (
-            <SummaTree
-              selected={selected}
-              onSelect={handleTreeSelect}
-              onCollapse={() => setLeftOpen(false)}
-            />
-          )}
-        </aside>
 
-        {/* Center — always full width on mobile */}
-        <main className="flex-1 flex flex-col overflow-hidden border-r border-border min-w-0">
+            {/* Tab bar */}
+            <div className="shrink-0 flex items-stretch border-b border-border">
+              {([
+                { id: "browse",    Icon: BookOpen, label: "Browse"    },
+                { id: "bookmarks", Icon: Bookmark, label: "Saved"     },
+                { id: "history",   Icon: Clock,    label: "History"   },
+              ] as const).map(({ id, Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setSidebarTab(id)}
+                  title={label}
+                  className={cn(
+                    "flex-1 flex items-center justify-center min-h-[44px] py-2.5 border-b-2 transition-colors",
+                    sidebarTab === id
+                      ? "border-foreground/35 text-foreground/65"
+                      : "border-transparent text-muted-foreground/30 hover:text-muted-foreground/55"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            {sidebarTab === "browse" && (
+              <SummaTree selected={selected} onSelect={handleTreeSelect} />
+            )}
+            {sidebarTab === "bookmarks" && (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No bookmarks yet</p>
+              </div>
+            )}
+            {sidebarTab === "history" && (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No history yet</p>
+              </div>
+            )}
+          </>
+        )}
+      </aside>
+
+      {/* ── Content column ── */}
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+        {/* Header */}
+        <header className="relative shrink-0 flex items-center border-b border-border px-2 py-2.5 z-10 bg-background">
+          {/* Mobile: hamburger */}
+          {isMobile && (
+            <button
+              onClick={() => { setLeftOpen((o) => !o); setRightOpen(false); }}
+              title="Open navigation"
+              className="shrink-0 p-2.5 text-muted-foreground/50 hover:text-foreground transition-colors"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Collapse/expand toggle — far left of header, against the sidebar edge */}
+          {!isMobile && (
+            <button
+              onClick={() => setLeftOpen((o) => !o)}
+              title={leftOpen ? "Collapse sidebar" : "Expand sidebar"}
+              className="shrink-0 p-2.5 mr-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+            >
+              {leftOpen
+                ? <PanelLeftClose className="h-3.5 w-3.5" />
+                : <PanelLeftOpen className="h-3.5 w-3.5" />
+              }
+            </button>
+          )}
+
+          {/* Search — centered on desktop, flex-1 on mobile */}
+          <form
+            onSubmit={handleSearch}
+            className={cn(
+              isMobile
+                ? "flex-1 mx-2"
+                : "absolute left-1/2 -translate-x-1/2 w-[420px] max-w-[44vw]",
+            )}
+          >
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/35 pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search the Summa…"
+                className="w-full pl-8 pr-8 py-1.5 bg-secondary border border-border rounded text-[12px] font-cardo text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:border-foreground/25 transition-colors"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Right: chat (mobile) + theme toggle */}
+          <div className="shrink-0 flex items-center gap-0.5 ml-auto pr-2">
+            {isMobile && (
+              <button
+                onClick={() => { setRightOpen((o) => !o); setLeftOpen(false); }}
+                title="Open AI chat"
+                className="p-2.5 text-muted-foreground/50 hover:text-foreground transition-colors"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              title="Toggle theme"
+              className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
+            >
+              {mounted && (resolvedTheme === "dark"
+                ? <Sun className="h-3.5 w-3.5" />
+                : <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Main content */}
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
           <ContentViewer
             selected={selected}
             searchQuery={searchQuery}
@@ -330,9 +342,7 @@ export default function SummaShell() {
               setSearchInput("");
               const slug = PART_TO_SLUG[previousSelected.partId];
               if (previousSelected.articleN !== undefined) {
-                router.push(
-                  `/${slug}/${previousSelected.questionN}/${previousSelected.articleN}`,
-                );
+                router.push(`/${slug}/${previousSelected.questionN}/${previousSelected.articleN}`);
               } else {
                 router.push(`/${slug}/${previousSelected.questionN}`);
               }
@@ -351,56 +361,6 @@ export default function SummaShell() {
             }}
           />
         </main>
-
-        {/* Right panel — drawer on mobile, fixed-width column on desktop */}
-        {/* <aside */}
-        {/*   className={cn( */}
-        {/*     "shrink-0 flex flex-col overflow-hidden bg-background", */}
-        {/*     isMobile */}
-        {/*       ? cn( */}
-        {/*           "fixed inset-y-0 right-0 z-50 border-l border-border transition-transform duration-200 ease-in-out", */}
-        {/*           rightOpen ? "translate-x-0" : "translate-x-full" */}
-        {/*         ) */}
-        {/*       : "transition-[width] duration-200 ease-in-out" */}
-        {/*   )} */}
-        {/*   style={{ width: isMobile ? RIGHT_W : rightW }} */}
-        {/* > */}
-        {/*   {!isMobile && !rightOpen ? ( */}
-        {/*     <div className="flex flex-col items-center pt-3 gap-3"> */}
-        {/*       <button */}
-        {/*         onClick={() => setRightOpen(true)} */}
-        {/*         title="Expand AI chat panel" */}
-        {/*         className="p-1.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors" */}
-        {/*       > */}
-        {/*         <PanelRightOpen className="h-3.5 w-3.5" /> */}
-        {/*       </button> */}
-        {/*     </div> */}
-        {/*   ) : ( */}
-        {/*     <AIChatPanel */}
-        {/*       ref={chatPanelRef} */}
-        {/*       selected={selected} */}
-        {/*       onCollapse={() => setRightOpen(false)} */}
-        {/*       onNavigate={(urlPath) => { */}
-        {/*         const [, fragment] = urlPath.split("#"); */}
-        {/*         router.push(urlPath); */}
-        {/*         // Open the left sidebar so SummaTree mounts and auto-scrolls to the cited article. */}
-        {/*         // On mobile hide the chat drawer instead — user sees the article in center. */}
-        {/*         if (isMobile) { */}
-        {/*           setRightOpen(false); */}
-        {/*         } else { */}
-        {/*           setLeftOpen(true); */}
-        {/*         } */}
-        {/*         // Also scroll the article section directly in case we're already on that page */}
-        {/*         if (fragment) { */}
-        {/*           setTimeout(() => { */}
-        {/*             document.getElementById(fragment)?.scrollIntoView({ behavior: "smooth", block: "start" }); */}
-        {/*           }, 150); */}
-        {/*         } */}
-        {/*       }} */}
-        {/*     /> */}
-        {/*   )} */}
-        {/* </aside> */}
-        {/**/}
       </div>
     </div>
   );

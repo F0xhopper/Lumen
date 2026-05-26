@@ -145,3 +145,20 @@
 .markdown sup {
   @apply text-xs text-muted-foreground;
 }
+
+/* Keyboard focus rings — restores visibility removed by focus:outline-none.
+   Placed outside @layer so it has higher cascade priority than Tailwind utilities,
+   while :focus-visible keeps it invisible for mouse/pointer interactions. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid hsl(var(--ring) / 0.5);
+  outline-offset: 2px;
+  border-radius: calc(var(--radius));
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid hsl(var(--ring) / 0.35);
+  outline-offset: 1px;
+}

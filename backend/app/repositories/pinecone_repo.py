@@ -22,6 +22,7 @@ class PineconeRepository:
         dense_vector: list[float],
         sparse_vector: dict | None,
         top_k: int,
+        alpha: float = 0.7,
     ) -> list[PineconeMatch]:
         kwargs = dict(
             namespace=settings.PINECONE_NAMESPACE,
@@ -31,10 +32,10 @@ class PineconeRepository:
         if sparse_vector is not None:
             result = await asyncio.to_thread(
                 self._index.query,
-                vector=[v * 0.7 for v in dense_vector],
+                vector=[v * alpha for v in dense_vector],
                 sparse_vector={
                     "indices": sparse_vector["indices"],
-                    "values": [v * 0.3 for v in sparse_vector["values"]],
+                    "values": [v * (1 - alpha) for v in sparse_vector["values"]],
                 },
                 **kwargs,
             )

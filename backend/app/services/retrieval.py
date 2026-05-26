@@ -46,6 +46,7 @@ async def hybrid_search(
     client: AsyncOpenAI,
     pinecone_repo: PineconeRepository,
     top_k: int = 8,
+    alpha: float = 0.7,
     min_score: float = 0.3,
     do_rerank: bool = True,
 ) -> list[PassageResult]:
@@ -57,7 +58,7 @@ async def hybrid_search(
     """
     dense = await embedding.embed(query, client)
     fetch_k = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
-    candidates = await search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k)
+    candidates = await search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k, alpha=alpha)
 
     if not candidates:
         return []
@@ -88,36 +89,50 @@ async def combined_search(
     min_score: float = 0.3,
     do_rerank: bool = True,
 ) -> list[PassageResult]:
-    """Parallel FTS + semantic search; reranks both legs on a shared scale."""
-    exact_passages, semantic = await asyncio.gather(
+    """Parallel FTS + semantic search; single reranker pass scores all candidates
+    on a shared scale before merging."""
+    dense = await embedding.embed(query, client)
+    fetch_k = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
+
+    exact_passages, pinecone_matches = await asyncio.gather(
         article_repo.fts_search(query, limit=top_k),
-        hybrid_search(
-            query, client, pinecone_repo,
-            top_k=top_k, min_score=min_score, do_rerank=do_rerank,
-        ),
+        search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k),
     )
 
-    if exact_passages:
-        texts = [p.text for p in exact_passages]
-        rr_scores = await reranker.rerank(query, texts) if do_rerank else None
-        if rr_scores is not None:
-            exact_passages = [
-                p.model_copy(update={"score": round(float(s), 4)})
-                for p, s in zip(exact_passages, rr_scores)
-            ]
-        else:
-            exact_passages = [p.model_copy(update={"score": 0.85}) for p in exact_passages]
-
-    exact_passages = [p for p in exact_passages if p.score >= min_score]
-
+    # Deduplicate: FTS results take priority; drop Pinecone matches for same article+section.
     exact_keys = {(p.part_abbr, p.question_n, p.article_n, p.section) for p in exact_passages}
-    merged = exact_passages + [
-        p for p in semantic
-        if (p.part_abbr, p.question_n, p.article_n, p.section) not in exact_keys
+    unique_pinecone = [
+        m for m in pinecone_matches
+        if (m.metadata.get("part_abbr"), int(m.metadata.get("question_n", 0)),
+            int(m.metadata.get("article_n", 0)), m.metadata.get("section", "body")) not in exact_keys
     ]
-    merged.sort(key=lambda p: p.score, reverse=True)
 
-    return [
-        p.model_copy(update={"rank": i})
-        for i, p in enumerate(merged[:top_k], 1)
-    ]
+    # Convert FTS passages to a common text list for joint reranking.
+    all_texts = [p.text for p in exact_passages] + [m.text for m in unique_pinecone]
+
+    if do_rerank and all_texts:
+        scores = await reranker.rerank(query, all_texts)
+    else:
+        scores = None
+
+    results: list[PassageResult] = []
+    if scores is not None:
+        fts_scores = scores[: len(exact_passages)]
+        pine_scores = scores[len(exact_passages):]
+        exact_passages = [
+            p.model_copy(update={"score": round(float(s), 4)})
+            for p, s in zip(exact_passages, fts_scores)
+        ]
+        results = exact_passages + [
+            _match_to_passage(m, 0, s)
+            for m, s in zip(unique_pinecone, pine_scores)
+        ]
+    else:
+        exact_passages = [p.model_copy(update={"score": 0.85}) for p in exact_passages]
+        results = exact_passages + [
+            _match_to_passage(m, 0, m.score) for m in unique_pinecone
+        ]
+
+    results = [r for r in results if r.score >= min_score]
+    results.sort(key=lambda r: r.score, reverse=True)
+    return [r.model_copy(update={"rank": i}) for i, r in enumerate(results[:top_k], 1)]

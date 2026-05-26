@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo, useRef, useEffect } from "react";
-import { ChevronRight, Search, X, PanelLeftClose } from "lucide-react";
+import { ChevronRight, Search, X } from "lucide-react";
 import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 interface SummaTreeProps {
   selected: SelectedNode | null;
   onSelect: (node: SelectedNode) => void;
-  onCollapse: () => void;
 }
 
 /* ── Filter tree types ── */
@@ -69,8 +68,8 @@ function buildFilterTree(query: string): PartMatch[] | null {
 /* ── Treatise divider ── */
 const TreatiseDivider = memo(({ label, dim }: { label: string; dim?: boolean }) => (
   <p className={cn(
-    "px-3 pt-3 pb-1 text-[8px] uppercase tracking-widest font-medium select-none",
-    dim ? "text-muted-foreground/20" : "text-muted-foreground/30"
+    "px-3 pt-2.5 pb-1 text-[11px] uppercase tracking-[0.08em] font-medium select-none",
+    dim ? "text-muted-foreground/40" : "text-muted-foreground/55"
   )}>
     {label}
   </p>
@@ -83,12 +82,14 @@ const ArticleRow = memo(({ n, title, isSelected, onClick }: { n: number; title?:
     onClick={onClick}
     data-selected={isSelected ? "" : undefined}
     className={cn(
-      "w-full text-left px-4 py-[3px] transition-colors flex items-start gap-1.5",
-      isSelected ? "bg-foreground/10 text-foreground" : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-accent"
+      "w-full text-left px-4 py-2 transition-colors flex items-start gap-1.5 border-l-2",
+      isSelected
+        ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
+        : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
     )}
   >
-    <span className="text-[9px] font-mono shrink-0 mt-px">A.{n}</span>
-    {title && <span className="text-[9px] leading-snug">{title}</span>}
+    <span className="text-[11px] font-mono shrink-0 mt-px text-muted-foreground/55">A.{n}</span>
+    {title && <span className="text-[11px] leading-snug">{title}</span>}
   </button>
 ));
 ArticleRow.displayName = "ArticleRow";
@@ -114,18 +115,20 @@ const QuestionRow = memo(({
         onClick={onToggle}
         data-selected={isQSelected ? "" : undefined}
         className={cn(
-          "w-full flex items-start gap-1 px-2 py-[5px] text-left transition-colors group",
-          isQSelected ? "bg-foreground/10" : "hover:bg-accent"
+          "w-full flex items-start gap-1 px-2 py-2.5 text-left transition-colors group border-l-2",
+          isQSelected
+            ? "border-foreground/40 bg-foreground/[0.07]"
+            : "border-transparent hover:bg-foreground/[0.04]"
         )}
       >
-        <ChevronRight className={cn("h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/30 transition-transform", expanded && "rotate-90")} />
-        <span className="text-[9px] font-mono text-muted-foreground/45 shrink-0 mt-px">{q.n}.</span>
-        <span className={cn("text-[10px] leading-snug", isQSelected ? "text-foreground" : "text-foreground/65 group-hover:text-foreground/90")}>
+        <ChevronRight className={cn("h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/45 transition-transform", expanded && "rotate-90")} />
+        <span className="text-[11px] font-mono text-muted-foreground/55 shrink-0 mt-px">{q.n}.</span>
+        <span className={cn("text-[12px] leading-snug", isQSelected ? "text-foreground" : "text-foreground/75 group-hover:text-foreground/95")}>
           {q.title}
         </span>
       </button>
       {expanded && (
-        <div className="pl-5 border-l border-border/40 ml-5">
+        <div className="pl-5 border-l border-border/60 ml-5">
           {Array.from({ length: articleCount }, (_, i) => i + 1).map((n) => (
             <ArticleRow
               key={n}
@@ -143,7 +146,7 @@ const QuestionRow = memo(({
 QuestionRow.displayName = "QuestionRow";
 
 /* ── Main tree ── */
-export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeProps) {
+export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
@@ -185,34 +188,27 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Search + collapse */}
-      <div className="shrink-0 flex items-center gap-1.5 px-2 py-2 border-b border-border">
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground/30 pointer-events-none" />
+      {/* Filter */}
+      <div className="shrink-0 px-2 py-2 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground/45 pointer-events-none" />
           <input
             ref={filterRef}
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter…"
-            className="w-full pl-6 pr-5 py-1.5 bg-secondary border border-border rounded text-[10px] text-foreground placeholder:text-muted-foreground/35 focus:outline-none focus:border-foreground/20 transition-colors"
+            placeholder="Filter structure…"
+            className="w-full pl-6 pr-5 py-2 bg-secondary border border-border rounded text-[12px] text-foreground placeholder:text-muted-foreground/45 focus:outline-none focus:border-foreground/25 transition-colors"
           />
           {filter && (
             <button
               onClick={() => { setFilter(""); filterRef.current?.focus(); }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground/30 hover:text-muted-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground/50 hover:text-foreground transition-colors"
             >
               <X className="h-2.5 w-2.5" />
             </button>
           )}
         </div>
-        <button
-          onClick={onCollapse}
-          title="Collapse panel"
-          className="shrink-0 p-1 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
-        >
-          <PanelLeftClose className="h-3.5 w-3.5" />
-        </button>
       </div>
 
       {/* Content */}
@@ -221,26 +217,26 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
         {/* ── Filter tree ── */}
         {filterTree !== null ? (
           filterTree.length === 0 ? (
-            <p className="px-3 py-5 text-[10px] text-muted-foreground/35 italic font-cardo">No results</p>
+            <p className="px-3 py-5 text-[11px] text-muted-foreground/50 italic font-cardo">No results</p>
           ) : (
             filterTree.map((pm) => (
               <div key={pm.part.id}>
                 {/* Part header */}
                 <button
                   onClick={() => expandAndClear(pm.part.id)}
-                  className="w-full flex items-center gap-1.5 px-3 py-2.5 hover:bg-accent text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-3 hover:bg-foreground/[0.04] text-left transition-colors"
                 >
                   <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/45 rotate-90" />
                   <div className="min-w-0">
-                    <p className={cn("text-[11px] font-medium leading-tight", pm.selfMatch ? "text-foreground" : "text-foreground/55")}>
+                    <p className={cn("text-[13px] leading-tight", pm.selfMatch ? "text-foreground" : "text-foreground/70")}>
                       {pm.part.label}
                     </p>
-                    <p className="text-[9px] text-muted-foreground/50 mt-px">{pm.part.abbr}</p>
+                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">{pm.part.abbr}</p>
                   </div>
                 </button>
 
                 {/* Treatises */}
-                <div className="border-l border-border/40 ml-4">
+                <div className="border-l border-border/60 ml-4">
                   {pm.treatises.map((tm, ti) => (
                     <div key={ti}>
                       <TreatiseDivider label={tm.label} dim={!tm.selfMatch && tm.questions.length === 0} />
@@ -251,20 +247,20 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
                           <button
                             onClick={() => expandAndClear(pm.part.id, `${pm.part.id}-q${qm.q.n}`)}
                             className={cn(
-                              "w-full flex items-start gap-1 px-2 py-[5px] text-left transition-colors group",
+                              "w-full flex items-start gap-1 px-2 py-2.5 text-left transition-colors group border-l-2",
                               selected?.partId === pm.part.id && selected.questionN === qm.q.n && selected.articleN === undefined
-                                ? "bg-foreground/10"
-                                : "hover:bg-accent"
+                                ? "border-foreground/40 bg-foreground/[0.07]"
+                                : "border-transparent hover:bg-foreground/[0.04]"
                             )}
                           >
                             <ChevronRight className={cn(
-                              "h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/30 transition-transform",
+                              "h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/45 transition-transform",
                               qm.articles.length > 0 && "rotate-90"
                             )} />
-                            <span className="text-[9px] font-mono text-muted-foreground/45 shrink-0 mt-px">{qm.q.n}.</span>
+                            <span className="text-[11px] font-mono text-muted-foreground/55 shrink-0 mt-px">{qm.q.n}.</span>
                             <span className={cn(
-                              "text-[10px] leading-snug",
-                              qm.selfMatch ? "text-foreground/90" : "text-foreground/55 group-hover:text-foreground/80"
+                              "text-[12px] leading-snug",
+                              qm.selfMatch ? "text-foreground/90" : "text-foreground/70 group-hover:text-foreground/90"
                             )}>
                               {qm.q.title}
                             </span>
@@ -272,7 +268,7 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
 
                           {/* Matching articles */}
                           {qm.articles.length > 0 && (
-                            <div className="pl-5 border-l border-border/40 ml-5">
+                            <div className="pl-5 border-l border-border/60 ml-5">
                               {qm.articles.map((art) => {
                                 const isSel = selected?.partId === pm.part.id && selected.questionN === qm.q.n && selected.articleN === art.n;
                                 return (
@@ -283,12 +279,14 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
                                       onSelect({ partId: pm.part.id, partLabel: pm.part.label, partAbbr: pm.part.abbr, questionN: qm.q.n, questionTitle: qm.q.title, articleN: art.n });
                                     }}
                                     className={cn(
-                                      "w-full text-left px-4 py-[3px] transition-colors flex items-start gap-1.5",
-                                      isSel ? "bg-foreground/10 text-foreground" : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-accent"
+                                      "w-full text-left px-4 py-2 transition-colors flex items-start gap-1.5 border-l-2",
+                                      isSel
+                                        ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
+                                        : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
                                     )}
                                   >
-                                    <span className="text-[9px] font-mono shrink-0 mt-px">A.{art.n}</span>
-                                    <span className="text-[9px] leading-snug">{art.title}</span>
+                                    <span className="text-[11px] font-mono shrink-0 mt-px text-muted-foreground/55">A.{art.n}</span>
+                                    <span className="text-[11px] leading-snug">{art.title}</span>
                                   </button>
                                 );
                               })}
@@ -311,16 +309,16 @@ export default function SummaTree({ selected, onSelect, onCollapse }: SummaTreeP
               <div key={part.id}>
                 <button
                   onClick={() => togglePart(part.id)}
-                  className="w-full flex items-center gap-1.5 px-3 py-2.5 hover:bg-accent text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-3 hover:bg-foreground/[0.04] text-left transition-colors"
                 >
                   <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground/45 transition-transform", partExpanded && "rotate-90")} />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-foreground leading-tight">{part.label}</p>
-                    <p className="text-[9px] text-muted-foreground mt-px">{part.abbr} · {part.treatises.reduce((s, t) => s + t.questions.length, 0)} qq.</p>
+                    <p className="text-[13px] text-foreground leading-tight">{part.label}</p>
+                    <p className="text-[11px] text-muted-foreground/65 mt-0.5">{part.abbr} · {part.treatises.reduce((s, t) => s + t.questions.length, 0)} qq.</p>
                   </div>
                 </button>
                 {partExpanded && (
-                  <div className="border-l border-border/40 ml-4">
+                  <div className="border-l border-border/60 ml-4">
                     {part.treatises.map((treatise, ti) => (
                       <div key={ti}>
                         <TreatiseDivider label={treatise.label} />

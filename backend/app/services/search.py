@@ -33,7 +33,8 @@ async def pinecone_hybrid_search(
     dense_vector: list[float],
     repo: PineconeRepository,
     top_k: int,
+    alpha: float = 0.7,
 ) -> list[PineconeMatch]:
     bm25 = _bm25
     sparse = bm25.encode_queries(query_text) if bm25 is not None else None
-    return await repo.hybrid_query(dense_vector, sparse, top_k)
+    return await repo.hybrid_query(dense_vector, sparse, top_k, alpha=alpha)
