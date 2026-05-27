@@ -9,49 +9,42 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   PanelRightOpen,
-  Sun,
-  Moon,
+  PanelRightClose,
   Menu,
   MessageSquare,
   BookOpen,
   Bookmark,
   Clock,
+  Sun,
+  Moon,
 } from "lucide-react";
-import SummaTree from "@/components/SummaTree";
-import ContentViewer from "@/components/ContentViewer";
+import Image from "next/image";
+import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
+import ContentViewer, { type ContentViewerHandle } from "@/components/ContentViewer";
 import AIChatPanel, { type AIChatPanelHandle } from "@/components/AIChatPanel";
-import { SUMMA_PARTS, type SelectedNode } from "@/lib/summa-full";
+import KeybindingsHelp from "@/components/KeybindingsHelp";
+import { SUMMA_PARTS, type SelectedNode, getAdjacentArticles } from "@/lib/summa-full";
+import { SLUG_TO_PART_ID, nodeUrl } from "@/lib/navigation";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { useKeybindings } from "@/hooks/useKeybindings";
 import { cn } from "@/lib/utils";
 
 const LEFT_W = 258;
-const RIGHT_W = 300;
-const STRIP_W = 0;
+const RIGHT_W = 280;
 
-const PART_SLUG: Record<string, string> = {
-  "1": "prima-pars",
-  "1-2": "prima-secundae",
-  "2-2": "secunda-secundae",
-  "3": "tertia-pars",
-};
-const PART_TO_SLUG: Record<string, string> = Object.fromEntries(
-  Object.entries(PART_SLUG).map(([k, v]) => [v, k]),
-);
+function parseParams(params: ReturnType<typeof useParams>): SelectedNode | null {
+  function str(v: string | string[] | undefined): string | null {
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) return v[0] ?? null;
+    return null;
+  }
 
-function str(v: string | string[] | undefined): string | null {
-  if (typeof v === "string") return v;
-  if (Array.isArray(v)) return v[0] ?? null;
-  return null;
-}
-
-function nodeFromParams(
-  params: ReturnType<typeof useParams>,
-): SelectedNode | null {
   const slug = str(params.part);
   const qRaw = str(params.question);
   const aRaw = str(params.article);
 
   if (!slug || !qRaw) return null;
-  const partId = PART_SLUG[slug];
+  const partId = SLUG_TO_PART_ID[slug];
   if (!partId) return null;
 
   const questionN = parseInt(qRaw, 10);
@@ -76,42 +69,37 @@ function nodeFromParams(
   };
 }
 
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
-
 export default function SummaShell() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isMobile = useIsMobile();
-  const selected = nodeFromParams(params);
+  const selected = parseParams(params);
   const { resolvedTheme, setTheme } = useTheme();
 
   const chatPanelRef = useRef<AIChatPanelHandle>(null);
+  const contentViewerRef = useRef<ContentViewerHandle>(null);
+  const summaTreeRef = useRef<SummaTreeHandle>(null);
 
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [previousSelected, setPreviousSelected] = useState<SelectedNode | null>(
-    null,
-  );
+  const [previousSelected, setPreviousSelected] = useState<SelectedNode | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "history">("browse");
   const inputRef = useRef<HTMLInputElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
 
-  // Close both panels on mobile by default
+  useEffect(() => {
+    if (isMobile && !leftOpen) {
+      hamburgerRef.current?.focus();
+    }
+  }, [isMobile, leftOpen]);
+
   useEffect(() => {
     if (isMobile) {
       setLeftOpen(false);
@@ -119,24 +107,68 @@ export default function SummaShell() {
     }
   }, [isMobile]);
 
-  // Sync ?q= param → state: restores search on back-navigation, clears it on article nav
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
     setSearchQuery(q);
     setSearchInput(q);
   }, [searchParams]);
 
+  const { prev: prevArticle, next: nextArticle } = selected
+    ? getAdjacentArticles(selected)
+    : { prev: null, next: null };
+
+  useKeybindings(
+    {
+      // Scroll
+      j:  () => contentViewerRef.current?.scrollBy(80),
+      k:  () => contentViewerRef.current?.scrollBy(-80),
+      d:  () => contentViewerRef.current?.scrollBy(320),
+      u:  () => contentViewerRef.current?.scrollBy(-320),
+      gg: () => contentViewerRef.current?.scrollToTop(),
+      G:  () => contentViewerRef.current?.scrollToBottom(),
+
+      // Article navigation
+      "[": () => { if (prevArticle) router.push(nodeUrl(prevArticle)); },
+      "]": () => { if (nextArticle) router.push(nodeUrl(nextArticle)); },
+
+      // Focus
+      "/": () => { inputRef.current?.focus(); inputRef.current?.select(); },
+      f: () => {
+        if (!isMobile) setLeftOpen(true);
+        setTimeout(() => summaTreeRef.current?.focusFilter(), 220);
+      },
+      a: () => {
+        setRightOpen(true);
+        setTimeout(() => chatPanelRef.current?.focusInput(), 220);
+      },
+
+      // Panels
+      b: () => setLeftOpen((o) => !o),
+      c: () => setRightOpen((o) => !o),
+
+      // Theme
+      t: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
+
+      // Help
+      "?": () => setHelpOpen((o) => !o),
+
+      // Escape
+      Escape: () => {
+        setHelpOpen(false);
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      },
+    },
+    { alwaysActive: ["Escape"] }
+  );
+
   const handleTreeSelect = (node: SelectedNode) => {
     setSearchQuery("");
     setSearchInput("");
     setPreviousSelected(null);
     if (isMobile) setLeftOpen(false);
-    const slug = PART_TO_SLUG[node.partId];
-    if (node.articleN !== undefined) {
-      router.push(`/${slug}/${node.questionN}/${node.articleN}`);
-    } else {
-      router.push(`/${slug}/${node.questionN}`);
-    }
+    router.push(nodeUrl(node));
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -145,8 +177,7 @@ export default function SummaShell() {
     if (!q) return;
     if (selected) setPreviousSelected(selected);
     setSearchQuery(q);
-    // push from article pages so back returns there; replace within search to avoid stacking
-    if (str(params.part)) {
+    if (params.part) {
       router.push(`/?q=${encodeURIComponent(q)}`);
     } else {
       router.replace(`/?q=${encodeURIComponent(q)}`);
@@ -157,14 +188,7 @@ export default function SummaShell() {
     setSearchQuery("");
     setSearchInput("");
     if (previousSelected) {
-      const slug = PART_TO_SLUG[previousSelected.partId];
-      if (previousSelected.articleN !== undefined) {
-        router.push(
-          `/${slug}/${previousSelected.questionN}/${previousSelected.articleN}`,
-        );
-      } else {
-        router.push(`/${slug}/${previousSelected.questionN}`);
-      }
+      router.push(nodeUrl(previousSelected));
       setPreviousSelected(null);
     } else {
       router.replace("/");
@@ -172,12 +196,8 @@ export default function SummaShell() {
     }
   };
 
-  const leftW = leftOpen ? LEFT_W : STRIP_W;
-  const rightW = rightOpen ? RIGHT_W : STRIP_W;
-
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* Mobile drawer backdrop */}
       {isMobile && (leftOpen || rightOpen) && (
         <div
           className="fixed inset-0 z-40 bg-background/75"
@@ -185,32 +205,30 @@ export default function SummaShell() {
         />
       )}
 
-      {/* ── Left sidebar — full height ── */}
       <aside
         className={cn(
-          "shrink-0 border-r border-border flex flex-col overflow-hidden bg-background",
+          "shrink-0 flex flex-col overflow-hidden bg-background",
           isMobile
             ? cn(
-                "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
+                "border-r border-border fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
                 leftOpen ? "translate-x-0" : "-translate-x-full",
               )
             : "transition-[width] duration-200 ease-in-out",
         )}
-        style={{ width: isMobile ? LEFT_W : leftW }}
+        style={{ width: isMobile ? LEFT_W : (leftOpen ? LEFT_W : 0) }}
       >
         {(leftOpen || isMobile) && (
           <>
-            {/* Branding */}
-            <div className="shrink-0 flex items-center px-4 h-12 border-b border-border">
-              <p className="font-cardo italic text-[17px] text-foreground/85 leading-none">Lumen</p>
+            <div className="shrink-0 flex items-center gap-2 px-4 h-12 border-b border-border">
+              <Image src="/sun-icon-white.png" alt="" width={40} height={40} className="opacity-70 dark:opacity-70 invert dark:invert-0" />
+              <p className="font-cardo italic text-[21px] text-foreground/85 leading-none">Lumen</p>
             </div>
 
-            {/* Tab bar */}
             <div className="shrink-0 flex items-stretch border-b border-border">
               {([
-                { id: "browse",    Icon: BookOpen, label: "Browse"    },
-                { id: "bookmarks", Icon: Bookmark, label: "Saved"     },
-                { id: "history",   Icon: Clock,    label: "History"   },
+                { id: "browse",    Icon: BookOpen, label: "Browse"  },
+                { id: "bookmarks", Icon: Bookmark, label: "Saved"   },
+                { id: "history",   Icon: Clock,    label: "History" },
               ] as const).map(({ id, Icon, label }) => (
                 <button
                   key={id}
@@ -228,9 +246,8 @@ export default function SummaShell() {
               ))}
             </div>
 
-            {/* Tab content */}
             {sidebarTab === "browse" && (
-              <SummaTree selected={selected} onSelect={handleTreeSelect} />
+              <SummaTree ref={summaTreeRef} selected={selected} onSelect={handleTreeSelect} />
             )}
             {sidebarTab === "bookmarks" && (
               <div className="flex-1 flex items-center justify-center p-6">
@@ -246,13 +263,20 @@ export default function SummaShell() {
         )}
       </aside>
 
-      {/* ── Content column ── */}
-      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-        {/* Header */}
-        <header className="relative shrink-0 flex items-center border-b border-border px-2 py-2.5 z-10 bg-background">
-          {/* Mobile: hamburger */}
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0 relative">
+        {!isMobile && leftOpen && (
+          <div
+            onClick={() => setLeftOpen((o) => !o)}
+            title="Collapse sidebar"
+            className="absolute left-0 inset-y-0 w-4 z-20 cursor-pointer group/edge"
+          >
+            <div className="absolute left-0 inset-y-0 w-[2px] bg-border group-hover/edge:bg-foreground/30 transition-colors duration-150" />
+          </div>
+        )}
+        <header className="relative shrink-0 flex items-center border-b border-border px-2 h-12 z-10 bg-background">
           {isMobile && (
             <button
+              ref={hamburgerRef}
               onClick={() => { setLeftOpen((o) => !o); setRightOpen(false); }}
               title="Open navigation"
               className="shrink-0 p-2.5 text-muted-foreground/50 hover:text-foreground transition-colors"
@@ -261,7 +285,6 @@ export default function SummaShell() {
             </button>
           )}
 
-          {/* Collapse/expand toggle — far left of header, against the sidebar edge */}
           {!isMobile && (
             <button
               onClick={() => setLeftOpen((o) => !o)}
@@ -275,7 +298,6 @@ export default function SummaShell() {
             </button>
           )}
 
-          {/* Search — centered on desktop, flex-1 on mobile */}
           <form
             onSubmit={handleSearch}
             className={cn(
@@ -306,7 +328,6 @@ export default function SummaShell() {
             </div>
           </form>
 
-          {/* Right: chat (mobile) + theme toggle */}
           <div className="shrink-0 flex items-center gap-0.5 ml-auto pr-2">
             {isMobile && (
               <button
@@ -317,9 +338,21 @@ export default function SummaShell() {
                 <MessageSquare className="h-4 w-4" />
               </button>
             )}
+            {!isMobile && (
+              <button
+                onClick={() => setRightOpen((o) => !o)}
+                title={rightOpen ? "Collapse AI chat (c)" : "Expand AI chat (c)"}
+                className="p-2.5 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+              >
+                {rightOpen
+                  ? <PanelRightClose className="h-3.5 w-3.5" />
+                  : <PanelRightOpen className="h-3.5 w-3.5" />
+                }
+              </button>
+            )}
             <button
               onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              title="Toggle theme"
+              title="Toggle theme (t)"
               className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
             >
               {mounted && (resolvedTheme === "dark"
@@ -330,9 +363,9 @@ export default function SummaShell() {
           </div>
         </header>
 
-        {/* Main content */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
           <ContentViewer
+            ref={contentViewerRef}
             selected={selected}
             searchQuery={searchQuery}
             previousSelected={previousSelected}
@@ -340,12 +373,7 @@ export default function SummaShell() {
               if (!previousSelected) return;
               setSearchQuery("");
               setSearchInput("");
-              const slug = PART_TO_SLUG[previousSelected.partId];
-              if (previousSelected.articleN !== undefined) {
-                router.push(`/${slug}/${previousSelected.questionN}/${previousSelected.articleN}`);
-              } else {
-                router.push(`/${slug}/${previousSelected.questionN}`);
-              }
+              router.push(nodeUrl(previousSelected));
               setPreviousSelected(null);
             }}
             onHighlightSearch={(text) => {
@@ -362,6 +390,31 @@ export default function SummaShell() {
           />
         </main>
       </div>
+
+      {/* Right panel — AI chat */}
+      <aside
+        className={cn(
+          "shrink-0 flex flex-col overflow-hidden bg-background border-l border-border",
+          isMobile
+            ? cn(
+                "fixed inset-y-0 right-0 z-50 transition-transform duration-200 ease-in-out",
+                rightOpen ? "translate-x-0" : "translate-x-full",
+              )
+            : "transition-[width] duration-200 ease-in-out",
+        )}
+        style={{ width: isMobile ? RIGHT_W : (rightOpen ? RIGHT_W : 0) }}
+      >
+        {(rightOpen || isMobile) && (
+          <AIChatPanel
+            ref={chatPanelRef}
+            selected={selected}
+            onCollapse={() => setRightOpen(false)}
+            onNavigate={(path) => router.push(path)}
+          />
+        )}
+      </aside>
+
+      <KeybindingsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

@@ -1,5 +1,3 @@
-// Typed API client — all server fetches go through here
-
 export interface SectionItem {
   n: number;
   text: string;
@@ -49,7 +47,7 @@ export interface CitationResult {
   section_label: string;
   article_title: string;
   question_title: string;
-  url_path: string; // e.g. "/1/2/3#respondeo"
+  url_path: string;
 }
 
 export interface PinnedSection {
@@ -111,7 +109,6 @@ export async function postQuery(req: QueryRequest): Promise<QueryResponse> {
   });
   if (!res.ok) throw new Error(`${res.status}`);
   const data = await res.json();
-  // Normalise: backend always returns citations[], but guard against old shape
   return {
     answer: data.answer ?? "",
     citations: data.citations ?? [],
@@ -120,7 +117,6 @@ export async function postQuery(req: QueryRequest): Promise<QueryResponse> {
   };
 }
 
-// Server-Sent Events streaming query
 export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "token"; text: string }
@@ -150,7 +146,7 @@ export async function* streamQuery(req: QueryRequest): AsyncGenerator<StreamEven
         try {
           yield JSON.parse(line.slice(6)) as StreamEvent;
         } catch {
-          // malformed SSE line — skip
+          // malformed SSE line
         }
       }
     }

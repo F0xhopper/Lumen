@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, memo, useRef, useEffect } from "react";
+import { useState, memo, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { cn } from "@/lib/utils";
+
+export interface SummaTreeHandle {
+  focusFilter: () => void;
+}
 
 interface SummaTreeProps {
   selected: SelectedNode | null;
   onSelect: (node: SelectedNode) => void;
 }
 
-/* ── Filter tree types ── */
 interface ArticleMatch { n: number; title: string }
 interface QuestionMatch { q: SummaQuestion; selfMatch: boolean; articles: ArticleMatch[] }
 interface TreatiseMatch { label: string; selfMatch: boolean; questions: QuestionMatch[] }
@@ -65,7 +68,6 @@ function buildFilterTree(query: string): PartMatch[] | null {
   return tree;
 }
 
-/* ── Treatise divider ── */
 const TreatiseDivider = memo(({ label, dim }: { label: string; dim?: boolean }) => (
   <p className={cn(
     "px-3 pt-2.5 pb-1 text-[11px] uppercase tracking-[0.08em] font-medium select-none",
@@ -76,13 +78,12 @@ const TreatiseDivider = memo(({ label, dim }: { label: string; dim?: boolean }) 
 ));
 TreatiseDivider.displayName = "TreatiseDivider";
 
-/* ── Article row ── */
 const ArticleRow = memo(({ n, title, isSelected, onClick }: { n: number; title?: string; isSelected: boolean; onClick: () => void }) => (
   <button
     onClick={onClick}
     data-selected={isSelected ? "" : undefined}
     className={cn(
-      "w-full text-left px-4 py-2 transition-colors flex items-start gap-1.5 border-l-2",
+      "w-full text-left px-4 py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
       isSelected
         ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
         : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
@@ -94,7 +95,6 @@ const ArticleRow = memo(({ n, title, isSelected, onClick }: { n: number; title?:
 ));
 ArticleRow.displayName = "ArticleRow";
 
-/* ── Question row ── */
 const QuestionRow = memo(({
   q, part, selected, onSelect, expanded, onToggle,
 }: {
@@ -115,7 +115,7 @@ const QuestionRow = memo(({
         onClick={onToggle}
         data-selected={isQSelected ? "" : undefined}
         className={cn(
-          "w-full flex items-start gap-1 px-2 py-2.5 text-left transition-colors group border-l-2",
+          "w-full flex items-start gap-1 px-2 py-2.5 rounded text-left transition-colors group border-l-2",
           isQSelected
             ? "border-foreground/40 bg-foreground/[0.07]"
             : "border-transparent hover:bg-foreground/[0.04]"
@@ -145,13 +145,19 @@ const QuestionRow = memo(({
 });
 QuestionRow.displayName = "QuestionRow";
 
-/* ── Main tree ── */
-export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
+const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree(
+  { selected, onSelect },
+  ref
+) {
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusFilter: () => { filterRef.current?.focus(); filterRef.current?.select(); },
+  }));
 
   const togglePart = (id: string) =>
     setExpandedParts((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -159,7 +165,6 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
   const toggleQuestion = (key: string) =>
     setExpandedQuestions((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
-  /* Auto-expand and scroll to selected node */
   useEffect(() => {
     if (!selected) return;
     setExpandedParts((prev) => {
@@ -188,7 +193,6 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Filter */}
       <div className="shrink-0 px-2 py-2 border-b border-border">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground/45 pointer-events-none" />
@@ -211,20 +215,17 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
         </div>
       </div>
 
-      {/* Content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain py-1 select-none">
 
-        {/* ── Filter tree ── */}
         {filterTree !== null ? (
           filterTree.length === 0 ? (
             <p className="px-3 py-5 text-[11px] text-muted-foreground/50 italic font-cardo">No results</p>
           ) : (
             filterTree.map((pm) => (
               <div key={pm.part.id}>
-                {/* Part header */}
                 <button
                   onClick={() => expandAndClear(pm.part.id)}
-                  className="w-full flex items-center gap-2 px-3 py-3 hover:bg-foreground/[0.04] text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
                 >
                   <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/45 rotate-90" />
                   <div className="min-w-0">
@@ -235,19 +236,17 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
                   </div>
                 </button>
 
-                {/* Treatises */}
                 <div className="border-l border-border/60 ml-4">
                   {pm.treatises.map((tm, ti) => (
                     <div key={ti}>
                       <TreatiseDivider label={tm.label} dim={!tm.selfMatch && tm.questions.length === 0} />
 
-                      {/* Questions */}
                       {tm.questions.map((qm) => (
                         <div key={qm.q.n}>
                           <button
                             onClick={() => expandAndClear(pm.part.id, `${pm.part.id}-q${qm.q.n}`)}
                             className={cn(
-                              "w-full flex items-start gap-1 px-2 py-2.5 text-left transition-colors group border-l-2",
+                              "w-full flex items-start gap-1 px-2 py-2.5 rounded text-left transition-colors group border-l-2",
                               selected?.partId === pm.part.id && selected.questionN === qm.q.n && selected.articleN === undefined
                                 ? "border-foreground/40 bg-foreground/[0.07]"
                                 : "border-transparent hover:bg-foreground/[0.04]"
@@ -266,7 +265,6 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
                             </span>
                           </button>
 
-                          {/* Matching articles */}
                           {qm.articles.length > 0 && (
                             <div className="pl-5 border-l border-border/60 ml-5">
                               {qm.articles.map((art) => {
@@ -279,7 +277,7 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
                                       onSelect({ partId: pm.part.id, partLabel: pm.part.label, partAbbr: pm.part.abbr, questionN: qm.q.n, questionTitle: qm.q.title, articleN: art.n });
                                     }}
                                     className={cn(
-                                      "w-full text-left px-4 py-2 transition-colors flex items-start gap-1.5 border-l-2",
+                                      "w-full text-left px-4 py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
                                       isSel
                                         ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
                                         : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
@@ -302,14 +300,13 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
           )
         ) : (
 
-          /* ── Normal tree ── */
           SUMMA_PARTS.map((part) => {
             const partExpanded = expandedParts.has(part.id);
             return (
               <div key={part.id}>
                 <button
                   onClick={() => togglePart(part.id)}
-                  className="w-full flex items-center gap-2 px-3 py-3 hover:bg-foreground/[0.04] text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
                 >
                   <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground/45 transition-transform", partExpanded && "rotate-90")} />
                   <div className="min-w-0">
@@ -347,4 +344,6 @@ export default function SummaTree({ selected, onSelect }: SummaTreeProps) {
       </div>
     </div>
   );
-}
+});
+
+export default SummaTree;

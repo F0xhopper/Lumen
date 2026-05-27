@@ -4,17 +4,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Loader2 } from "lucide-react";
 import { fetchPassages } from "@/lib/api";
 import type { PinnedSection } from "@/lib/api";
+import { API_ABBR_TO_SLUG } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-const PART_SLUG: Record<string, string> = {
-  I: "1",
-  "I-II": "1-2",
-  "II-II": "2-2",
-  III: "3",
-};
-
 function passageToPin(p: Awaited<ReturnType<typeof fetchPassages>>[number]): PinnedSection {
-  const slug = PART_SLUG[p.part_abbr] ?? p.part_abbr.toLowerCase();
+  const slug = API_ABBR_TO_SLUG[p.part_abbr] ?? p.part_abbr.toLowerCase();
   return {
     part_abbr: p.part_abbr,
     question_n: p.question_n,
@@ -46,7 +40,6 @@ export default function SectionPicker({ onSelect, onClose, anchorRef }: Props) {
     inputRef.current?.focus();
   }, []);
 
-  // Close on outside click
   useEffect(() => {
     function handle(e: MouseEvent) {
       if (
@@ -63,10 +56,7 @@ export default function SectionPicker({ onSelect, onClose, anchorRef }: Props) {
   }, [onClose, anchorRef]);
 
   const search = useCallback(async (q: string) => {
-    if (!q.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!q.trim()) { setResults([]); return; }
     setLoading(true);
     try {
       const passages = await fetchPassages(q, 8);
@@ -79,7 +69,6 @@ export default function SectionPicker({ onSelect, onClose, anchorRef }: Props) {
     }
   }, []);
 
-  // Debounce search
   useEffect(() => {
     const id = setTimeout(() => search(query), 280);
     return () => clearTimeout(id);
@@ -102,7 +91,6 @@ export default function SectionPicker({ onSelect, onClose, anchorRef }: Props) {
       className="absolute bottom-full left-0 mb-1 w-full z-50 bg-background border border-border rounded shadow-lg overflow-hidden"
       style={{ maxHeight: 320 }}
     >
-      {/* Search input */}
       <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border">
         <Search className="h-3 w-3 text-muted-foreground/40 shrink-0" />
         <input
@@ -116,15 +104,12 @@ export default function SectionPicker({ onSelect, onClose, anchorRef }: Props) {
         {loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40 shrink-0" />}
       </div>
 
-      {/* Results */}
       <div className="overflow-y-auto" style={{ maxHeight: 260 }}>
         {results.length === 0 && query.trim() && !loading && (
           <p className="px-3 py-4 text-[10px] text-muted-foreground/40 text-center">No sections found</p>
         )}
         {results.length === 0 && !query.trim() && (
-          <p className="px-3 py-4 text-[10px] text-muted-foreground/30 text-center">
-            Type to search the Summa
-          </p>
+          <p className="px-3 py-4 text-[10px] text-muted-foreground/30 text-center">Type to search the Summa</p>
         )}
         {results.map((p, i) => {
           const loc = `ST ${p.part_abbr} Q.${p.question_n} A.${p.article_n}`;

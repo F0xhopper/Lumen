@@ -37,7 +37,6 @@ interface RefProps {
   onNavigate: (urlPath: string) => void;
 }
 
-// Inline [[N]] reference within answer text
 export function InlineCitationRef({ refNum, citations, onNavigate }: RefProps) {
   const citation = citations.find((c) => c.ref === refNum);
   if (!citation) {

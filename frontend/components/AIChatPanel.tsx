@@ -4,38 +4,19 @@ import {
   useState, useRef, useEffect, useCallback,
   forwardRef, useImperativeHandle,
 } from "react";
-import { Send, Loader2, RotateCcw, PanelRightClose, X, Eye, Quote } from "lucide-react";
+import { Send, Loader2, RotateCcw, PanelRightClose } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import CitationChip from "./CitationChip";
+import {
+  ContextArgChip,
+  SentContextArg,
+  buildContextPrefix,
+  type ContextArg,
+} from "./ContextArgChip";
 import { postQuery } from "@/lib/api";
 import type { CitationResult, ConversationTurn } from "@/lib/api";
 import type { SelectedNode } from "@/lib/summa-full";
 import { cn } from "@/lib/utils";
-
-// ── Context argument types ─────────────────────────────────────────────────────
-
-type ViewingArg = { id: "viewing"; type: "viewing"; node: SelectedNode };
-type QuoteArg   = { id: string;   type: "quote";   text: string; node: SelectedNode };
-export type ContextArg = ViewingArg | QuoteArg;
-
-function nodeLabel(node: SelectedNode): string {
-  const base = `${node.partAbbr} Q.${node.questionN}`;
-  return node.articleN !== undefined ? `${base} A.${node.articleN}` : base;
-}
-
-function buildContextPrefix(args: ContextArg[]): string {
-  return args
-    .map((a) => {
-      if (a.type === "viewing") {
-        return `[Viewing: ${nodeLabel(a.node)} — "${a.node.questionTitle}"]`;
-      }
-      const snippet = a.text.length > 120 ? a.text.slice(0, 120) + "…" : a.text;
-      return `[Quote from ${nodeLabel(a.node)}: "${snippet}"]`;
-    })
-    .join("\n");
-}
-
-// ── Message type ───────────────────────────────────────────────────────────────
 
 interface Message {
   id: string;
@@ -47,10 +28,9 @@ interface Message {
   passagesUsed?: number;
 }
 
-// ── Ref handle ─────────────────────────────────────────────────────────────────
-
 export interface AIChatPanelHandle {
   addQuote: (text: string, node: SelectedNode) => void;
+  focusInput: () => void;
 }
 
 interface Props {
@@ -58,60 +38,6 @@ interface Props {
   onCollapse: () => void;
   onNavigate?: (urlPath: string) => void;
 }
-
-// ── Context arg chips ──────────────────────────────────────────────────────────
-
-function ContextArgChip({ arg, onRemove }: { arg: ContextArg; onRemove: () => void }) {
-  if (arg.type === "viewing") {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border/60 bg-secondary/70 text-[8.5px] font-mono text-foreground/60 max-w-full">
-        <Eye className="h-[9px] w-[9px] shrink-0 text-muted-foreground/40" />
-        <span className="truncate">{nodeLabel(arg.node)}</span>
-        <button onClick={onRemove} className="ml-0.5 shrink-0 text-muted-foreground/40 hover:text-foreground/70 transition-colors">
-          <X className="h-2 w-2" />
-        </button>
-      </span>
-    );
-  }
-
-  const snippet = arg.text.length > 50 ? arg.text.slice(0, 50) + "…" : arg.text;
-  return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border/60 bg-secondary/70 text-[8.5px] font-mono text-foreground/60 max-w-full">
-      <Quote className="h-[9px] w-[9px] shrink-0 text-muted-foreground/40" />
-      <span className="truncate italic">"{snippet}"</span>
-      <span className="text-muted-foreground/35 shrink-0">·</span>
-      <span className="shrink-0">{nodeLabel(arg.node)}</span>
-      <button onClick={onRemove} className="ml-0.5 shrink-0 text-muted-foreground/40 hover:text-foreground/70 transition-colors">
-        <X className="h-2 w-2" />
-      </button>
-    </span>
-  );
-}
-
-// ── Sent-message context chips (read-only) ─────────────────────────────────────
-
-function SentContextArg({ arg, onNavigate }: { arg: ContextArg; onNavigate?: (urlPath: string) => void }) {
-  const PART_SLUG: Record<string, string> = { I: "1", "I-II": "1-2", "II-II": "2-2", III: "3" };
-  const urlPath = arg.node.articleN !== undefined
-    ? `/${PART_SLUG[arg.node.partAbbr]}/${arg.node.questionN}/${arg.node.articleN}`
-    : `/${PART_SLUG[arg.node.partAbbr]}/${arg.node.questionN}`;
-  const Icon = arg.type === "viewing" ? Eye : Quote;
-  const label = arg.type === "viewing"
-    ? nodeLabel(arg.node)
-    : `"${arg.text.length > 40 ? arg.text.slice(0, 40) + "…" : arg.text}" · ${nodeLabel(arg.node)}`;
-
-  return (
-    <button
-      onClick={() => onNavigate?.(urlPath)}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border/40 bg-secondary/40 text-[8.5px] font-mono text-muted-foreground/50 hover:text-foreground/70 hover:border-border transition-colors max-w-full"
-    >
-      <Icon className="h-[9px] w-[9px] shrink-0" />
-      <span className="truncate">{label}</span>
-    </button>
-  );
-}
-
-// ── Main component ─────────────────────────────────────────────────────────────
 
 const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
   { selected, onCollapse, onNavigate },
@@ -126,7 +52,6 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastViewingKeyRef = useRef<string | null>(null);
 
-  // Auto-add viewing arg when navigating to a new article
   useEffect(() => {
     if (!selected) {
       setContextArgs((prev) => prev.filter((a) => a.type !== "viewing"));
@@ -147,6 +72,9 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
       const id = `quote-${Date.now()}`;
       setContextArgs((prev) => [...prev, { id, type: "quote", text, node }]);
     },
+    focusInput() {
+      inputRef.current?.focus();
+    },
   }));
 
   useEffect(() => {
@@ -163,16 +91,11 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
     if (id === "viewing") lastViewingKeyRef.current = null;
   };
 
-  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-  };
-
   const send = useCallback(async () => {
     if (!input.trim() || isPending) return;
 
     const userText = input.trim();
     const currentArgs = [...contextArgs];
-
     const prefix = buildContextPrefix(currentArgs);
     const fullQuery = prefix ? `${prefix}\n\n${userText}` : userText;
 
@@ -190,7 +113,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    setContextArgs((prev) => prev.filter((a) => a.type === "viewing")); // keep viewing, clear quotes
+    setContextArgs((prev) => prev.filter((a) => a.type === "viewing"));
     setIsPending(true);
 
     try {
@@ -198,7 +121,6 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         query: fullQuery,
         conversation_history: history,
       });
-
       setMessages((prev) => [
         ...prev,
         {
@@ -225,14 +147,12 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
     }
   }, [input, isPending, messages, contextArgs]);
 
-  const clear = () => {
-    setMessages([]);
-    // Keep contextArgs — viewing chip persists
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
       <div className="shrink-0 flex items-center gap-2 px-3 py-3 border-b border-border">
         <button
           onClick={onCollapse}
@@ -244,7 +164,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         <div className="flex-1 min-w-0" />
         {messages.length > 0 && (
           <button
-            onClick={clear}
+            onClick={() => setMessages([])}
             className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
             title="Clear conversation"
           >
@@ -253,7 +173,6 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         )}
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="text-center pt-6 px-2">
@@ -311,9 +230,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
 
                 {msg.citations && msg.citations.length > 0 && (
                   <div className="border-t border-border/40 pt-2 space-y-1">
-                    <p className="text-[8px] tracking-[0.12em] uppercase text-muted-foreground/30">
-                      Sources
-                    </p>
+                    <p className="text-[8px] tracking-[0.12em] uppercase text-muted-foreground/30">Sources</p>
                     <div className="flex flex-wrap gap-1">
                       {msg.citations.map((c) => (
                         <CitationChip key={c.ref} citation={c} onNavigate={handleNavigate} />
@@ -345,7 +262,6 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
       <div className="shrink-0 border-t border-border p-3">
         {contextArgs.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">

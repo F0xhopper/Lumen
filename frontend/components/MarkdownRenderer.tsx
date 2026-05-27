@@ -12,33 +12,16 @@ interface MarkdownRendererProps {
   onNavigate?: (urlPath: string) => void;
 }
 
-// Sentinel we embed so ReactMarkdown passes it through as inline code.
-// Chosen to be unambiguous and not appear in normal Aquinas text.
 const CITE_SENTINEL = "§cite:";
 
-/**
- * Preprocess the markdown string before handing it to ReactMarkdown.
- *
- * Converts both [N] and [[N]] citation refs into inline-code sentinels that
- * the custom `code` renderer below will turn into clickable CitationChip nodes.
- *
- * [N] style — what GPT-4.1 naturally produces when asked for numeric citations.
- * [[N]] style — double-bracket fallback.
- *
- * We only convert [N] when N matches a known citation ref to avoid clobbering
- * legitimate markdown like "[see above]".
- */
 function preprocessCitations(content: string, citations: CitationResult[]): string {
   if (citations.length === 0) return content;
   const refs = new Set(citations.map((c) => c.ref));
 
-  // Replace [[N]] (double bracket) — unambiguous, always convert
   let out = content.replace(/\[\[(\d+)\]\]/g, (_, n) =>
     refs.has(n) ? `\`${CITE_SENTINEL}${n}\`` : `[[${n}]]`
   );
 
-  // Replace [N] (single bracket) only when N matches a citation ref
-  // Negative lookbehind/lookahead to avoid matching markdown links [text](url)
   out = out.replace(/\[(\d+)\](?!\()/g, (full, n) =>
     refs.has(n) ? `\`${CITE_SENTINEL}${n}\`` : full
   );
@@ -61,7 +44,6 @@ export default function MarkdownRenderer({
         remarkPlugins={[remarkGfm]}
         components={{
           code({ className, children, ...props }) {
-            // Intercept citation sentinels — never reach the block/inline code branch
             const text = String(children).trim();
             if (text.startsWith(CITE_SENTINEL) && onNavigate && citations.length > 0) {
               const refNum = text.slice(CITE_SENTINEL.length);
