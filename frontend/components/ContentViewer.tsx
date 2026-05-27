@@ -446,7 +446,7 @@ export default function ContentViewer({
 }) {
   const router = useRouter();
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
-  const [lang, setLang] = useState<LangMode>("both");
+  const lang: LangMode = "both";
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { prev: prevNode, next: nextNode } = selected
@@ -610,23 +610,6 @@ export default function ContentViewer({
           </div>
           {isArticleMode && (
             <div className="flex items-center gap-3 shrink-0">
-              <div className="flex border border-border/40 rounded overflow-hidden">
-                {(["en", "both", "la"] as const).map((l) => (
-                  <button
-                    key={l}
-                    onClick={() => setLang(l)}
-                    className={cn(
-                      "font-inter text-[11px] px-3 py-2 transition-colors",
-                      lang === l
-                        ? "bg-foreground/[0.07] text-foreground/70"
-                        : "text-muted-foreground/45 hover:text-muted-foreground/75"
-                    )}
-                  >
-                    {l === "en" ? "EN" : l === "la" ? "LA" : "EN · LA"}
-                  </button>
-                ))}
-              </div>
-              <div className="w-px h-4 bg-border/40" />
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => prevNode && router.push(articleUrl(prevNode))}
