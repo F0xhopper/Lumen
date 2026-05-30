@@ -1,5 +1,3 @@
-"""RAG agent — iterative search + synthesis via GPT-4.1 tool use."""
-
 import json
 import re
 from dataclasses import dataclass
@@ -15,13 +13,11 @@ from app.services.retrieval import combined_search
 
 logger = get_logger(__name__)
 
-# ── Constants ────────────────────────────────────────────────────────────────
-
 _MAX_AGENT_STEPS = 3
 _PASSAGES_PER_SEARCH = 6
-_PASSAGE_MAX_CHARS = 1200      # per-passage character cap sent to the model
-_TOOL_RESULT_MAX_CHARS = 8000  # hard cap on the full tool-result string per call
-_HISTORY_TURNS = 6             # max conversation turns to include
+_PASSAGE_MAX_CHARS = 1200
+_TOOL_RESULT_MAX_CHARS = 8000
+_HISTORY_TURNS = 6
 
 _VALID_PART_ABBRS = frozenset({"I", "I-II", "II-II", "III"})
 
@@ -31,8 +27,6 @@ _PART_TO_SLUG: dict[str, str] = {
     "II-II": "2-2",
     "III": "3",
 }
-
-# ── Tool definition ──────────────────────────────────────────────────────────
 
 _SEARCH_TOOL = {
     "type": "function",
@@ -61,8 +55,6 @@ _SEARCH_TOOL = {
         },
     },
 }
-
-# ── System prompt ────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """\
 You are a scholarly assistant specialising in the Summa Theologica of St. Thomas Aquinas. \
@@ -128,8 +120,6 @@ At the very end of your answer output exactly this block, then stop. Nothing aft
 - Valid part_abbr values: `I`, `I-II`, `II-II`, `III`.
 """
 
-# ── Data types ───────────────────────────────────────────────────────────────
-
 
 @dataclass
 class AgentResult:
@@ -137,9 +127,6 @@ class AgentResult:
     citations: list[CitationResult]
     passages_used: int
     agent_steps: int
-
-
-# ── Pure helpers ─────────────────────────────────────────────────────────────
 
 
 def _url_path(part_abbr: str, question_n: int, article_n: int, url_fragment: str) -> str:
@@ -154,7 +141,6 @@ def _truncate(text: str, max_chars: int) -> str:
 
 
 def _normalize_inline_refs(text: str) -> str:
-    """Convert [[N]] → [N] throughout the answer (GPT sometimes outputs double brackets)."""
     return re.sub(r"\[\[(\d+)\]\]", r"[\1]", text)
 
 
@@ -169,7 +155,6 @@ def _format_pinned(pinned: list[PinnedSection]) -> str:
 
 
 def _passage_to_tool_result(passages: list[PassageResult]) -> str:
-    """Serialise passages into a compact, token-capped string for the tool result."""
     if not passages:
         return "No passages found for that query."
     lines = []
@@ -224,8 +209,6 @@ def _last_assistant_content(messages: list[ChatCompletionMessageParam]) -> str:
     return ""
 
 
-# ── Citation parsing ─────────────────────────────────────────────────────────
-
 _CITATIONS_RE = re.compile(r"```citations[ \t]*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
@@ -252,7 +235,6 @@ def _parse_citation_line(
     seen_refs: set[str],
     all_passages: list[PassageResult],
 ) -> CitationResult | None:
-    # Strip stray backticks the model may include in field values
     fields = [f.strip().strip("`") for f in line.split("|")]
     if len(fields) < 5:
         logger.warning("Citation line too short (skipped): %r", line)
@@ -304,7 +286,6 @@ def _parse_citations_block(
     text: str,
     all_passages: list[PassageResult],
 ) -> tuple[str, list[CitationResult]]:
-    """Extract the ```citations block; return (clean_answer, citations)."""
     match = _CITATIONS_RE.search(text)
     if not match:
         logger.warning("No citations block found in agent response")
@@ -330,9 +311,6 @@ def _parse_citations_block(
     return clean_answer, citations
 
 
-# ── Tool execution ───────────────────────────────────────────────────────────
-
-
 async def _execute_tool_call(
     tc,
     fallback_query: str,
@@ -340,7 +318,6 @@ async def _execute_tool_call(
     article_repo,
     pinecone_repo: PineconeRepository,
 ) -> tuple[str, list[PassageResult]]:
-    """Parse a tool call, run the search, return (search_query, passages)."""
     try:
         args = json.loads(tc.function.arguments)
         search_query = args.get("query", fallback_query)
@@ -358,9 +335,6 @@ async def _execute_tool_call(
         top_k=top_k,
     )
     return search_query, passages
-
-
-# ── Agent loop ───────────────────────────────────────────────────────────────
 
 
 async def run_agent(
@@ -416,7 +390,6 @@ async def run_agent(
                 agent_steps=agent_steps,
             )
 
-    # Exceeded max steps — synthesise from the last assistant content
     raw_answer = _last_assistant_content(messages)
     clean_answer, citations = _parse_citations_block(raw_answer, all_passages)
     return AgentResult(

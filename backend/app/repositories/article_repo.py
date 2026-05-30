@@ -1,5 +1,3 @@
-"""PostgreSQL queries for summa_articles."""
-
 import json
 import asyncpg
 
@@ -128,10 +126,6 @@ def _parse_section_items(raw) -> list[SectionItem]:
     return [SectionItem(**item) for item in items]
 
 
-# ---------------------------------------------------------------------------
-# Repository class — used by routes via FastAPI Depends()
-# ---------------------------------------------------------------------------
-
 class ArticleRepository:
     def __init__(self, pool: asyncpg.Pool):
         self._pool = pool
@@ -176,7 +170,6 @@ class ArticleRepository:
         return [ArticleSummary(article_n=r["article_n"], article_title=r["article_title"]) for r in rows]
 
     async def fts_search(self, query: str, limit: int = 8) -> list[PassageResult]:
-        """Full-text search across all text sections; score placeholder filled by reranker."""
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(_FTS_SQL, query, limit)
         results = []
@@ -199,10 +192,6 @@ class ArticleRepository:
             ))
         return results
 
-
-# ---------------------------------------------------------------------------
-# Module-level functions — used by lifespan and data pipeline scripts
-# ---------------------------------------------------------------------------
 
 async def ensure_schema():
     pool = get_db_pool()
@@ -320,7 +309,6 @@ async def upsert_latin(
     replies_la: list[SectionItem],
     source_url_la: str | None,
 ):
-    """Update only the Latin fields for an existing article."""
     pool = get_db_pool()
     async with pool.acquire() as conn:
         await conn.execute(

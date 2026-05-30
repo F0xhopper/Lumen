@@ -146,16 +146,12 @@
   @apply text-xs text-muted-foreground;
 }
 
-/* Prevent iOS Safari auto-zoom on inputs (requires font-size >= 16px) */
 @media (max-width: 767px) {
   input, select, textarea {
     font-size: 16px;
   }
 }
 
-/* Keyboard focus rings — restores visibility removed by focus:outline-none.
-   Placed outside @layer so it has higher cascade priority than Tailwind utilities,
-   while :focus-visible keeps it invisible for mouse/pointer interactions. */
 button:focus-visible,
 a:focus-visible,
 [role="button"]:focus-visible {
@@ -169,8 +165,6 @@ textarea:focus-visible {
   outline: 2px solid hsl(var(--ring) / 0.35);
   outline-offset: 1px;
 }
-
-/* ── Medieval ornamental styles ─────────────────── */
 
 .divider-ornamental {
   position: relative;

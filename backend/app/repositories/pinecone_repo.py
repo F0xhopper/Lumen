@@ -1,5 +1,3 @@
-"""Wraps Pinecone Index API — services never touch the raw Pinecone client shape."""
-
 import asyncio
 
 from pydantic import BaseModel, Field

@@ -696,8 +696,6 @@ export const SUMMA_PARTS: SummaPart[] = [
   },
 ];
 
-// ── Linear navigation ──────────────────────────────────────────────────────────
-
 type ArticleRef = Pick<SelectedNode, "partId" | "partLabel" | "partAbbr" | "questionN" | "questionTitle"> & { articleN: number };
 
 function buildLinearIndex(): ArticleRef[] {

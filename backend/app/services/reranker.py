@@ -1,5 +1,3 @@
-"""Cross-encoder reranking via sentence-transformers."""
-
 import asyncio
 
 from app.core.config import settings
@@ -33,7 +31,6 @@ def _score_pairs_sync(ranker, pairs: list[list[str]]) -> list[float]:
 
 
 async def rerank(query: str, texts: list[str]) -> list[float] | None:
-    """Return sigmoid-normalised scores in texts order, or None if reranker unavailable."""
     ranker = _ranker
     if ranker is None:
         return None

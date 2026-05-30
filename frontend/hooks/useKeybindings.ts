@@ -38,7 +38,6 @@ export function useKeybindings(
       const now = Date.now();
       const last = lastKeyRef.current;
 
-      // Double-key sequences (e.g. "gg") — only in normal mode
       if (!inputActive && last && now - last.time < 400 && last.key === key) {
         const seqKey = `${key}${key}`;
         if (bindingsRef.current[seqKey]) {

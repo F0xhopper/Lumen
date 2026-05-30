@@ -1,5 +1,3 @@
-"""Shared client singletons — created once at lifespan startup, exposed as FastAPI dependencies."""
-
 import asyncpg
 from openai import AsyncOpenAI
 from pinecone import Pinecone
@@ -42,8 +40,6 @@ def get_pinecone_index():
         _pinecone_index = pc.Index(settings.PINECONE_INDEX_NAME)
     return _pinecone_index
 
-
-# --- FastAPI dependency providers ---
 
 def get_article_repo():
     from app.repositories.article_repo import ArticleRepository

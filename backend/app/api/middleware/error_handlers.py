@@ -1,5 +1,3 @@
-"""Error handling middleware."""
-
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 

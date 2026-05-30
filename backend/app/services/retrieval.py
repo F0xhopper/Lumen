@@ -1,5 +1,3 @@
-"""Orchestrates embedding → Pinecone search → cross-encoder reranking."""
-
 import asyncio
 
 from openai import AsyncOpenAI
@@ -17,7 +15,6 @@ _RERANK_FETCH_MAX = 40
 
 
 def init_retrieval() -> None:
-    """Preload BM25 and reranker at startup to avoid first-request latency."""
     search.load_bm25()
     reranker.load_reranker()
 
@@ -50,12 +47,6 @@ async def hybrid_search(
     min_score: float = 0.3,
     do_rerank: bool = True,
 ) -> list[PassageResult]:
-    """
-    1. Embed query with OpenAI.
-    2. Hybrid Pinecone query (dense + sparse BM25); fetch fetch_k candidates.
-    3. Cross-encoder reranking (scores normalised to [0, 1] via sigmoid).
-    4. Drop results below min_score, return top_k.
-    """
     dense = await embedding.embed(query, client)
     fetch_k = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
     candidates = await search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k, alpha=alpha)
@@ -89,8 +80,6 @@ async def combined_search(
     min_score: float = 0.3,
     do_rerank: bool = True,
 ) -> list[PassageResult]:
-    """Parallel FTS + semantic search; single reranker pass scores all candidates
-    on a shared scale before merging."""
     dense = await embedding.embed(query, client)
     fetch_k = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
 
@@ -99,7 +88,6 @@ async def combined_search(
         search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k),
     )
 
-    # Deduplicate: FTS results take priority; drop Pinecone matches for same article+section.
     exact_keys = {(p.part_abbr, p.question_n, p.article_n, p.section) for p in exact_passages}
     unique_pinecone = [
         m for m in pinecone_matches
@@ -107,7 +95,6 @@ async def combined_search(
             int(m.metadata.get("article_n", 0)), m.metadata.get("section", "body")) not in exact_keys
     ]
 
-    # Convert FTS passages to a common text list for joint reranking.
     all_texts = [p.text for p in exact_passages] + [m.text for m in unique_pinecone]
 
     if do_rerank and all_texts:

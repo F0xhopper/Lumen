@@ -59,13 +59,6 @@ async def query_stream(
     pinecone_repo: PineconeRepository = Depends(get_pinecone_repo),
     article_repo: ArticleRepository = Depends(get_article_repo),
 ):
-    """
-    Server-Sent Events stream. Emits:
-      {"type": "status", "message": "..."} — agent search steps
-      {"type": "token",  "text": "..."}    — answer tokens
-      {"type": "done",   "citations": [...], "passages_used": N, "agent_steps": N}
-      {"type": "error",  "message": "..."}
-    """
     async def event_stream():
         try:
             all_passages: list[PassageResult] = []

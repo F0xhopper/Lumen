@@ -49,7 +49,7 @@ class ArticleSummary(BaseModel):
 
 
 class CitationResult(BaseModel):
-    ref: str           # "1", "2", ... matches [[1]] in answer text
+    ref: str
     part_abbr: str
     question_n: int
     article_n: int
@@ -57,7 +57,7 @@ class CitationResult(BaseModel):
     section_label: str
     article_title: str
     question_title: str
-    url_path: str      # e.g. "/1/2/3#respondeo" — used by frontend for navigation
+    url_path: str
 
 
 class PinnedSection(BaseModel):
@@ -73,7 +73,7 @@ class PinnedSection(BaseModel):
 
 
 class ConversationTurn(BaseModel):
-    role: str    # "user" | "assistant"
+    role: str
     content: str
 
 

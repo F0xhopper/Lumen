@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-Import Latin Summa Theologica text from corpusthomisticum.org.
-Must be run after import_summa.py (English articles must exist in DB first).
-
-Usage:
-    cd backend
-    python -m scripts.import_summa_latin
-"""
 
 import asyncio
 import json
@@ -25,7 +17,6 @@ from app.core.config import settings
 BASE_URL = "https://www.corpusthomisticum.org/"
 DELAY_S = 2.0
 
-# All STH pages per part — sourced from corpusthomisticum.org/iopera.html
 PART_PAGES: dict[str, list[str]] = {
     "prima-pars": [
         "sth1001.html", "sth1002.html", "sth1003.html", "sth1015.html",
@@ -59,12 +50,6 @@ PART_PAGES: dict[str, list[str]] = {
     ],
 }
 
-# TITLE attr format (from <P TITLE="...">):
-#   "I q. 1 a. 1 arg. 1"   → objection
-#   "I q. 1 a. 1 s. c."    → sed contra
-#   "I q. 1 a. 1 co."      → respondeo / conclusio
-#   "I q. 1 a. 1 ad 1"     → reply to objection
-#   "I q. 1 pr."           → question preamble (no article number — skipped)
 TITLE_RE = re.compile(
     r"q\.\s*(\d+)\s+a\.\s*(\d+)\s+(arg\.\s*\d+|s\.\s*c\.|co\.|ad\s*\d+|pr\.)",
     re.IGNORECASE,
@@ -78,17 +63,11 @@ def clean(text: str) -> str:
 
 
 def extract_text(p) -> str:
-    """
-    Walk a <P> tag's children, skipping the <A NAME> ref anchor and converting
-    <I> tags to "..." so italic quotes are preserved in the stored text.
-    This matches how newadvent English uses double-quotes for citations, letting
-    the existing renderWithQuotes frontend renderer italicise them.
-    """
     parts = []
     for el in p.children:
         name = getattr(el, "name", None)
         if name == "a":
-            continue  # <A NAME="..."> wraps only the ref span — skip entirely
+            continue
         elif name == "i":
             inner = el.get_text().strip()
             if inner:
@@ -96,15 +75,11 @@ def extract_text(p) -> str:
         elif name is not None:
             parts.append(el.get_text())
         else:
-            parts.append(str(el))  # NavigableString
+            parts.append(str(el))
     return clean("".join(parts))
 
 
 def parse_page(html: str, part_id: str, source_url: str) -> list[dict]:
-    """
-    Parse all articles on a single corpusthomisticum page.
-    Returns a list of article dicts ready for upsert.
-    """
     soup = BeautifulSoup(html, "html.parser")
     articles: dict[tuple[int, int], dict] = {}
 
@@ -112,7 +87,7 @@ def parse_page(html: str, part_id: str, source_url: str) -> list[dict]:
         title_attr = p.get("title", "")
         m = TITLE_RE.search(title_attr)
         if not m:
-            continue  # question preamble or unrecognised — skip
+            continue
 
         q_n      = int(m.group(1))
         a_n      = int(m.group(2))
@@ -156,7 +131,6 @@ def parse_page(html: str, part_id: str, source_url: str) -> list[dict]:
 
 
 async def upsert_latin_batch(conn: asyncpg.Connection, articles: list[dict]) -> int:
-    """UPDATE Latin fields only; returns number of rows actually updated."""
     result = await conn.executemany(
         """
         UPDATE summa_articles SET
@@ -178,8 +152,6 @@ async def upsert_latin_batch(conn: asyncpg.Connection, articles: list[dict]) -> 
             for a in articles
         ],
     )
-    # executemany returns the status string of the last command, not a row count;
-    # return article count as a proxy.
     return len(articles)
 
 
@@ -201,8 +173,7 @@ async def main() -> None:
                 try:
                     resp = await client.get(url)
                     resp.raise_for_status()
-                    # Page charset is ISO-8859-1 (declared in META tag)
-                    html     = resp.content.decode("iso-8859-1")
+                    html = resp.content.decode("iso-8859-1")
                     articles = parse_page(html, part_id, url)
 
                     if articles:
@@ -210,7 +181,7 @@ async def main() -> None:
                             await upsert_latin_batch(conn, articles)
                         total += len(articles)
                         has_resp = sum(1 for a in articles if a["respondeo_la"])
-                        has_obj  = sum(1 for a in articles if a["objections_la"])
+                        has_obj = sum(1 for a in articles if a["objections_la"])
                         print(
                             f"  {page_file}: {len(articles)} articles, "
                             f"{has_resp} respondeo, {has_obj} with objections",

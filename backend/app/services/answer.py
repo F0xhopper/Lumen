@@ -1,5 +1,3 @@
-"""Legacy shim — answer generation is now handled by services/agent.py."""
-
 from openai import AsyncOpenAI
 
 from app.models.schemas import PassageResult
@@ -17,7 +15,6 @@ def _format_context(passages: list[PassageResult]) -> str:
 async def generate_answer(
     query: str, passages: list[PassageResult], client: AsyncOpenAI
 ) -> str:
-    """Kept for backward compatibility with any script that imports it directly."""
     if not passages:
         return "No relevant passages found. Try rephrasing or ask about a specific Question and Article."
 

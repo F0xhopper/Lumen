@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""
-Embed each article section into Pinecone as a separate vector.
-
-One vector per section: respondeo, sed_contra, each objection, each reply.
-This gives the AI and search precise, citable chunks rather than whole articles.
-
-Usage:
-    cd backend
-    python -m scripts.index_summa
-"""
 
 import asyncio
 import json
@@ -29,8 +19,6 @@ EMBED_BATCH = 20
 UPSERT_BATCH = 100
 
 
-# ── URL slug mapping ───────────────────────────────────────────────────────────
-
 PART_TO_SLUG = {
     "prima-pars":       "1",
     "prima-secundae":   "1-2",
@@ -44,13 +32,7 @@ def article_url(part_id: str, question_n: int, article_n: int) -> str:
     return f"/{slug}/{question_n}/{article_n}"
 
 
-# ── Section expansion ──────────────────────────────────────────────────────────
-
 def expand_sections(row: asyncpg.Record) -> list[dict]:
-    """
-    Return one dict per indexable section.
-    Each dict has: id, text, section, section_label, url_fragment, metadata.
-    """
     pid = row["part_id"]
     qn  = row["question_n"]
     an  = row["article_n"]
@@ -73,7 +55,7 @@ def expand_sections(row: asyncpg.Record) -> list[dict]:
             return
         chunks.append({
             "id":            vec_id,
-            "text":          text.strip()[:4000],  # Pinecone metadata limit
+            "text":          text.strip()[:4000],
             "section":       section,
             "section_label": label,
             "url_fragment":  fragment,
@@ -83,15 +65,12 @@ def expand_sections(row: asyncpg.Record) -> list[dict]:
                               "article_url": base_url},
         })
 
-    # Respondeo — most important
     add(f"{base_id}-respondeo", row["respondeo"],
         "respondeo", "I answer that", "respondeo")
 
-    # Sed contra
     add(f"{base_id}-sed-contra", row["sed_contra"],
         "sed_contra", "On the contrary", "sed-contra")
 
-    # Individual objections
     raw_obj = row["objections"]
     objections = json.loads(raw_obj) if isinstance(raw_obj, str) else (raw_obj or [])
     for obj in objections:
@@ -99,7 +78,6 @@ def expand_sections(row: asyncpg.Record) -> list[dict]:
         add(f"{base_id}-obj-{n}", obj["text"],
             f"objection_{n}", f"Objection {n}", f"objection-{n}")
 
-    # Individual replies
     raw_rep = row["replies"]
     replies = json.loads(raw_rep) if isinstance(raw_rep, str) else (raw_rep or [])
     for rep in replies:
@@ -107,14 +85,11 @@ def expand_sections(row: asyncpg.Record) -> list[dict]:
         add(f"{base_id}-reply-{n}", rep["text"],
             f"reply_{n}", f"Reply to Objection {n}", f"reply-{n}")
 
-    # Fallback: full body if no sections parsed
     if not chunks:
         add(f"{base_id}-body", row["body"], "body", "Full article", "body")
 
     return chunks
 
-
-# ── Pinecone setup ─────────────────────────────────────────────────────────────
 
 def create_index_if_missing(pc: Pinecone):
     existing = [i.name for i in pc.list_indexes()]
@@ -133,8 +108,6 @@ def create_index_if_missing(pc: Pinecone):
     print("  Ready.")
 
 
-# ── Embedding & BM25 ──────────────────────────────────────────────────────────
-
 def fit_bm25(texts: list[str]) -> BM25Encoder:
     print(f"Fitting BM25 on {len(texts)} texts…")
     bm25 = BM25Encoder()
@@ -150,8 +123,6 @@ def embed_texts(client: OpenAI, texts: list[str]) -> list[list[float]]:
     return [r.embedding for r in sorted(resp.data, key=lambda x: x.index)]
 
 
-# ── Main ───────────────────────────────────────────────────────────────────────
-
 async def main():
     for var, val in [("DATABASE_URL", settings.DATABASE_URL),
                      ("PINECONE_API_KEY", settings.PINECONE_API_KEY),
@@ -166,7 +137,6 @@ async def main():
     create_index_if_missing(pc)
     index = pc.Index(settings.PINECONE_INDEX_NAME)
 
-    # Load all articles
     async with pool.acquire() as conn:
         all_rows = await conn.fetch(
             """SELECT id, part_id, part_abbr, question_n, question_title,
@@ -179,17 +149,14 @@ async def main():
 
     print(f"{len(all_rows)} articles to index.")
 
-    # Expand into sections
     all_chunks: list[dict] = []
     for row in all_rows:
         all_chunks.extend(expand_sections(row))
 
     print(f"{len(all_chunks)} section vectors total.")
 
-    # Fit BM25 on all section texts
     bm25 = fit_bm25([c["text"] for c in all_chunks])
 
-    # Upsert in batches
     total_upserted = 0
     article_ids_done: list[int] = []
     seen_article_ids: set[int] = set()
@@ -198,7 +165,6 @@ async def main():
         batch = all_chunks[i: i + UPSERT_BATCH]
         texts = [c["text"] for c in batch]
 
-        # Dense embeddings
         dense_vecs = []
         for j in range(0, len(texts), EMBED_BATCH):
             sub = texts[j: j + EMBED_BATCH]
@@ -206,7 +172,6 @@ async def main():
             if j + EMBED_BATCH < len(texts):
                 time.sleep(0.3)
 
-        # Sparse BM25
         sparse_vecs = bm25.encode_documents(texts)
 
         vectors = [
@@ -223,7 +188,6 @@ async def main():
         total_upserted += len(vectors)
         print(f"  {total_upserted}/{len(all_chunks)} vectors upserted…", flush=True)
 
-    # Mark articles indexed
     article_ids = [r["id"] for r in all_rows]
     if article_ids:
         async with pool.acquire() as conn:

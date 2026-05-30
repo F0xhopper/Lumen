@@ -146,7 +146,6 @@ export async function* streamQuery(req: QueryRequest): AsyncGenerator<StreamEven
         try {
           yield JSON.parse(line.slice(6)) as StreamEvent;
         } catch {
-          // malformed SSE line
         }
       }
     }

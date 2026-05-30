@@ -18,8 +18,7 @@ import {
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
 import ContentViewer, { type ContentViewerHandle } from "@/components/ContentViewer";
-import { type AIChatPanelHandle } from "@/components/AIChatPanel"; // right panel (type kept for ref)
-// import AIChatPanel from "@/components/AIChatPanel"; // right panel
+import { type AIChatPanelHandle } from "@/components/AIChatPanel";
 import KeybindingsHelp from "@/components/KeybindingsHelp";
 import { SUMMA_PARTS, type SelectedNode, getAdjacentArticles } from "@/lib/summa-full";
 import { SLUG_TO_PART_ID, nodeUrl } from "@/lib/navigation";
@@ -28,7 +27,6 @@ import { useKeybindings } from "@/hooks/useKeybindings";
 import { cn } from "@/lib/utils";
 
 const LEFT_W = 258;
-// const RIGHT_W = 280; // right panel
 
 function parseParams(params: ReturnType<typeof useParams>): SelectedNode | null {
   function str(v: string | string[] | undefined): string | null {
@@ -75,7 +73,7 @@ export default function SummaShell() {
   const selected = parseParams(params);
   const { resolvedTheme, setTheme } = useTheme();
 
-  const chatPanelRef = useRef<AIChatPanelHandle>(null); // right panel
+  const chatPanelRef = useRef<AIChatPanelHandle>(null);
   const contentViewerRef = useRef<ContentViewerHandle>(null);
   const summaTreeRef = useRef<SummaTreeHandle>(null);
 
@@ -84,7 +82,6 @@ export default function SummaShell() {
   const [searchInput, setSearchInput] = useState("");
   const [previousSelected, setPreviousSelected] = useState<SelectedNode | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
-  // const [rightOpen, setRightOpen] = useState(false); // right panel
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "history">("browse");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -114,7 +111,6 @@ export default function SummaShell() {
 
   useKeybindings(
     {
-      // Scroll
       j:  () => contentViewerRef.current?.scrollBy(80),
       k:  () => contentViewerRef.current?.scrollBy(-80),
       d:  () => contentViewerRef.current?.scrollBy(320),
@@ -122,29 +118,21 @@ export default function SummaShell() {
       gg: () => contentViewerRef.current?.scrollToTop(),
       G:  () => contentViewerRef.current?.scrollToBottom(),
 
-      // Article navigation
       "[": () => { if (prevArticle) router.push(nodeUrl(prevArticle)); },
       "]": () => { if (nextArticle) router.push(nodeUrl(nextArticle)); },
 
-      // Focus
       "/": () => { inputRef.current?.focus(); inputRef.current?.select(); },
       f: () => {
         if (!isMobile) setLeftOpen(true);
         setTimeout(() => summaTreeRef.current?.focusFilter(), 220);
       },
-      // a: () => { setRightOpen(true); setTimeout(() => chatPanelRef.current?.focusInput(), 220); }, // right panel
 
-      // Panels
       b: () => setLeftOpen((o) => !o),
-      // c: () => setRightOpen((o) => !o), // right panel
 
-      // Theme
       t: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
 
-      // Help
       "?": () => setHelpOpen((o) => !o),
 
-      // Escape
       Escape: () => {
         setHelpOpen(false);
         if (document.activeElement instanceof HTMLElement) {
@@ -190,7 +178,6 @@ export default function SummaShell() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
-      {/* Mobile backdrop — sits below header so header stays accessible */}
       {isMobile && leftOpen && (
         <div
           className="fixed top-12 inset-x-0 bottom-0 z-40 bg-background/75"
@@ -198,9 +185,7 @@ export default function SummaShell() {
         />
       )}
 
-      {/* Full-width header */}
       <header className="relative shrink-0 flex items-center h-12 border-b border-border px-2 z-10 bg-background">
-        {/* Sidebar toggle */}
         {isMobile ? (
           <button
             ref={hamburgerRef}
@@ -223,7 +208,6 @@ export default function SummaShell() {
           </button>
         )}
 
-        {/* Logo */}
         <div className="flex items-center gap-2 px-1 mr-2">
           <Image
             src="/sun-icon-white.png"
@@ -235,7 +219,6 @@ export default function SummaShell() {
           <p className="font-cardo italic text-[19px] text-foreground/85 leading-none hidden sm:block">Lumen</p>
         </div>
 
-        {/* Search — centered */}
         <form
           onSubmit={handleSearch}
           className={cn(
@@ -264,19 +247,7 @@ export default function SummaShell() {
           </div>
         </form>
 
-        {/* Right actions */}
         <div className="shrink-0 flex items-center gap-0.5 ml-auto pr-2">
-          {/* right panel toggle — commented out
-          {isMobile ? (
-            <button onClick={() => { setRightOpen((o) => !o); setLeftOpen(false); }} title="Open AI chat" className="p-2.5 text-muted-foreground/50 hover:text-foreground transition-colors">
-              <MessageSquare className="h-4 w-4" />
-            </button>
-          ) : (
-            <button onClick={() => setRightOpen((o) => !o)} title={rightOpen ? "Collapse AI chat (c)" : "Expand AI chat (c)"} className="p-2.5 text-muted-foreground/35 hover:text-foreground/70 transition-colors">
-              {rightOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-            </button>
-          )}
-          */}
           <button
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             title="Toggle theme (t)"
@@ -290,9 +261,7 @@ export default function SummaShell() {
         </div>
       </header>
 
-      {/* Body row */}
       <div className="flex flex-1 overflow-hidden min-w-0">
-        {/* Left sidebar */}
         <aside
           className={cn(
             "shrink-0 flex flex-col overflow-hidden bg-background",
@@ -307,7 +276,6 @@ export default function SummaShell() {
         >
           {(leftOpen || isMobile) && (
             <>
-              {/* Tabs */}
               <div className="shrink-0 flex items-stretch border-b border-border">
                 {([
                   { id: "browse",    Icon: BookOpen, label: "Browse"  },
@@ -347,7 +315,6 @@ export default function SummaShell() {
           )}
         </aside>
 
-        {/* Content + resize edge */}
         <div className="flex flex-col flex-1 overflow-hidden min-w-0 relative">
           {!isMobile && leftOpen && (
             <div
@@ -380,33 +347,12 @@ export default function SummaShell() {
               }}
               onHighlightAddToChat={(text) => {
                 if (!selected) return;
-                // setRightOpen(true); // right panel
                 chatPanelRef.current?.addQuote(text, selected);
               }}
             />
           </main>
         </div>
 
-        {/* Right panel — commented out
-        <aside
-          className={cn(
-            "shrink-0 flex flex-col overflow-hidden bg-background border-l border-border",
-            isMobile
-              ? cn("fixed inset-y-0 right-0 z-50 transition-transform duration-200 ease-in-out", rightOpen ? "translate-x-0" : "translate-x-full")
-              : "transition-[width] duration-200 ease-in-out",
-          )}
-          style={{ width: isMobile ? RIGHT_W : (rightOpen ? RIGHT_W : 0) }}
-        >
-          {(rightOpen || isMobile) && (
-            <AIChatPanel
-              ref={chatPanelRef}
-              selected={selected}
-              onCollapse={() => setRightOpen(false)}
-              onNavigate={(path) => router.push(path)}
-            />
-          )}
-        </aside>
-        */}
       </div>
 
       <KeybindingsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />

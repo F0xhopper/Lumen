@@ -1,1 +1,0 @@
-"""Lumen Backend Application Package"""

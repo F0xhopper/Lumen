@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-Scrape the full Summa Theologica from newadvent.org and store in PostgreSQL,
-parsing each article into its constituent sections.
-
-Usage:
-    cd backend
-    python -m scripts.import_summa
-"""
 
 import asyncio
 import json
@@ -41,8 +33,6 @@ def clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-# ── Section parsing ────────────────────────────────────────────────────────────
-
 OBJ_RE   = re.compile(r"^Objection\s+(\d+)\.?", re.IGNORECASE)
 REPLY_RE = re.compile(r"^Reply to Objection\s+(\d+)\.?", re.IGNORECASE)
 SC_RE    = re.compile(r"^On the contrary[,.]?", re.IGNORECASE)
@@ -50,13 +40,6 @@ ANS_RE   = re.compile(r"^I answer that[,.]?", re.IGNORECASE)
 
 
 def parse_sections(paragraphs: list[Tag]) -> dict:
-    """
-    Walk <p> tags for one article and split into:
-      objections  [{n, text}, ...]
-      sed_contra  str
-      respondeo   str
-      replies     [{n, text}, ...]
-    """
     sections: dict = {
         "objections": [],
         "sed_contra": None,
@@ -64,7 +47,7 @@ def parse_sections(paragraphs: list[Tag]) -> dict:
         "replies": [],
     }
 
-    current_type = None   # "obj" | "sc" | "ans" | "reply"
+    current_type = None
     current_n = None
     current_parts: list[str] = []
 
@@ -109,8 +92,6 @@ def parse_sections(paragraphs: list[Tag]) -> dict:
     return sections
 
 
-# ── Page parsing ───────────────────────────────────────────────────────────────
-
 def parse_question_page(html: str, part: dict, question_n: int) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -129,7 +110,6 @@ def parse_question_page(html: str, part: dict, question_n: int) -> list[dict]:
         article_n = int(m.group(1))
         article_title = m.group(2).strip()
 
-        # Collect <p> tags until the next <h2>
         paragraphs: list[Tag] = []
         body_parts: list[str] = []
         for sib in h2.next_siblings:
@@ -161,8 +141,6 @@ def parse_question_page(html: str, part: dict, question_n: int) -> list[dict]:
 
     return articles
 
-
-# ── DB helpers ─────────────────────────────────────────────────────────────────
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS summa_articles (
@@ -224,8 +202,6 @@ async def upsert_articles(conn: asyncpg.Connection, articles: list[dict]):
     )
 
 
-# ── Main ───────────────────────────────────────────────────────────────────────
-
 async def main():
     if not settings.DATABASE_URL:
         print("ERROR: DATABASE_URL not set in .env")
@@ -250,7 +226,6 @@ async def main():
                         async with pool.acquire() as conn:
                             await upsert_articles(conn, articles)
                         total += len(articles)
-                        # Show section parse quality
                         has_resp = sum(1 for a in articles if a["respondeo"])
                         print(f"  Q.{q_n}: {len(articles)} articles, {has_resp} with respondeo", flush=True)
                     else:

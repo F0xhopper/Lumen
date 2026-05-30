@@ -1,5 +1,3 @@
-"""Pinecone hybrid search (dense + sparse via BM25)."""
-
 from pathlib import Path
 
 from pinecone_text.sparse import BM25Encoder
