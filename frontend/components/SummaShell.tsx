@@ -190,10 +190,10 @@ export default function SummaShell() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
-      {/* Mobile backdrop */}
+      {/* Mobile backdrop — sits below header so header stays accessible */}
       {isMobile && leftOpen && (
         <div
-          className="fixed inset-0 z-40 bg-background/75"
+          className="fixed top-12 inset-x-0 bottom-0 z-40 bg-background/75"
           onClick={() => setLeftOpen(false)}
         />
       )}
@@ -232,7 +232,7 @@ export default function SummaShell() {
             height={28}
             className="opacity-70 dark:opacity-70 invert dark:invert-0"
           />
-          <p className="font-cardo italic text-[19px] text-foreground/85 leading-none">Lumen</p>
+          <p className="font-cardo italic text-[19px] text-foreground/85 leading-none hidden sm:block">Lumen</p>
         </div>
 
         {/* Search — centered */}
@@ -298,7 +298,7 @@ export default function SummaShell() {
             "shrink-0 flex flex-col overflow-hidden bg-background",
             isMobile
               ? cn(
-                  "border-r border-border fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
+                  "border-r border-border fixed top-12 bottom-0 left-0 z-50 transition-transform duration-200 ease-in-out",
                   leftOpen ? "translate-x-0" : "-translate-x-full",
                 )
               : "transition-[width] duration-200 ease-in-out",
@@ -319,7 +319,7 @@ export default function SummaShell() {
                     onClick={() => setSidebarTab(id)}
                     title={label}
                     className={cn(
-                      "flex-1 flex items-center justify-center min-h-[40px] py-2 border-b-2 transition-colors",
+                      "flex-1 flex items-center justify-center min-h-[44px] py-2 border-b-2 transition-colors",
                       sidebarTab === id
                         ? "border-foreground/35 text-foreground/65"
                         : "border-transparent text-muted-foreground/30 hover:text-muted-foreground/55"

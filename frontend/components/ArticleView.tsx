@@ -87,13 +87,15 @@ function SectionPairRow({
 }) {
   const extraClass = respondeoStyle ? "bg-foreground/[0.02] -mx-4 px-4 py-4 rounded" : undefined;
   return (
-    <div className="grid grid-cols-2">
-      <div className="pr-8">
+    <div className="grid grid-cols-1 md:grid-cols-2">
+      <div className="md:pr-8">
         {en && <SectionBlock id={enId} text={en} className={extraClass} />}
       </div>
-      <div className="border-l border-border/20 pl-8">
-        {la && <SectionBlock text={la} className={extraClass} />}
-      </div>
+      {la && (
+        <div className="md:border-l md:border-border/20 md:pl-8 mt-6 md:mt-0 border-t border-border/[0.12] pt-6 md:border-t-0 md:pt-0">
+          <SectionBlock text={la} className={extraClass} />
+        </div>
+      )}
     </div>
   );
 }

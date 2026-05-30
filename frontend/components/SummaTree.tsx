@@ -83,7 +83,7 @@ const ArticleRow = memo(({ n, title, isSelected, onClick }: { n: number; title?:
     onClick={onClick}
     data-selected={isSelected ? "" : undefined}
     className={cn(
-      "w-full text-left px-4 py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
+      "w-full text-left px-4 py-3 md:py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
       isSelected
         ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
         : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
@@ -115,7 +115,7 @@ const QuestionRow = memo(({
         onClick={onToggle}
         data-selected={isQSelected ? "" : undefined}
         className={cn(
-          "w-full flex items-start gap-1 px-2 py-2.5 rounded text-left transition-colors group border-l-2",
+          "w-full flex items-start gap-1 px-2 py-3 md:py-2.5 rounded text-left transition-colors group border-l-2",
           isQSelected
             ? "border-foreground/40 bg-foreground/[0.07]"
             : "border-transparent hover:bg-foreground/[0.04]"
@@ -242,7 +242,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
               <div key={pm.part.id}>
                 <button
                   onClick={() => expandAndClear(pm.part.id)}
-                  className="w-full flex items-center gap-2 px-3 py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-3.5 md:py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
                 >
                   <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/45 rotate-90" />
                   <div className="min-w-0">
@@ -263,7 +263,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
                           <button
                             onClick={() => expandAndClear(pm.part.id, `${pm.part.id}-q${qm.q.n}`)}
                             className={cn(
-                              "w-full flex items-start gap-1 px-2 py-2.5 rounded text-left transition-colors group border-l-2",
+                              "w-full flex items-start gap-1 px-2 py-3 md:py-2.5 rounded text-left transition-colors group border-l-2",
                               selected?.partId === pm.part.id && selected.questionN === qm.q.n && selected.articleN === undefined
                                 ? "border-foreground/40 bg-foreground/[0.07]"
                                 : "border-transparent hover:bg-foreground/[0.04]"
@@ -294,7 +294,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
                                       onSelect({ partId: pm.part.id, partLabel: pm.part.label, partAbbr: pm.part.abbr, questionN: qm.q.n, questionTitle: qm.q.title, articleN: art.n });
                                     }}
                                     className={cn(
-                                      "w-full text-left px-4 py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
+                                      "w-full text-left px-4 py-3 md:py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
                                       isSel
                                         ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
                                         : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
@@ -323,7 +323,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
               <div key={part.id}>
                 <button
                   onClick={() => togglePart(part.id)}
-                  className="w-full flex items-center gap-2 px-3 py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-3.5 md:py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
                 >
                   <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground/45 transition-transform", partExpanded && "rotate-90")} />
                   <div className="min-w-0">

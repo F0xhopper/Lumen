@@ -224,7 +224,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="shrink-0 px-7 py-3.5 border-b border-border">
+      <div className="shrink-0 px-4 py-3 sm:px-7 sm:py-3.5 border-b border-border">
         <div className={cn("mx-auto flex items-center justify-between gap-4", isSearchMode ? "max-w-prose" : "w-full")}>
           <div className="min-w-0">
             <ContentHeader
@@ -260,7 +260,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-7 py-7">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-7 sm:py-7">
         <div className={cn("mx-auto", isSearchMode ? "max-w-prose" : "w-full")}>
           {isLoading && (
             <div className="flex items-center gap-2.5 text-muted-foreground py-2">
