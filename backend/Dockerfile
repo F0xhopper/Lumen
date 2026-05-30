@@ -24,17 +24,20 @@ COPY --from=builder /install /usr/local
 COPY app/ app/
 COPY data/ data/
 
+RUN python -c "import nltk; nltk.download('punkt_tab', download_dir='/app/nltk_data', quiet=True)"
+
 RUN useradd --no-create-home --shell /bin/false appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    NLTK_DATA=/app/nltk_data
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--log-level", "debug"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
