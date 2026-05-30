@@ -58,15 +58,15 @@ function renderWithBoldLabel(text: string): React.ReactNode {
   const labelText = trailingPunct ? m[1].slice(0, -1) : m[1];
   return (
     <>
-      <span className={rubricClass(m[1])}>{labelText}</span>{trailingPunct}{" "}
+      <span className={cn(rubricClass(m[1]), "rubric-label")}>{labelText}</span>{trailingPunct}{" "}
       {renderWithQuotes(body)}
     </>
   );
 }
 
-function SectionBlock({ id, text, className }: { id?: string; text: string; className?: string }) {
+function SectionBlock({ id, text, className, dropcap }: { id?: string; text: string; className?: string; dropcap?: boolean }) {
   return (
-    <section id={id} className={cn("scroll-mt-6", className)}>
+    <section id={id} className={cn("scroll-mt-6", dropcap && "article-dropcap", className)}>
       <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/82 whitespace-pre-wrap">
         {renderWithBoldLabel(text)}
       </p>
@@ -79,17 +79,19 @@ function SectionPairRow({
   la,
   enId,
   respondeoStyle,
+  dropcap,
 }: {
   en: string | null;
   la: string | null;
   enId?: string;
   respondeoStyle?: boolean;
+  dropcap?: boolean;
 }) {
   const extraClass = respondeoStyle ? "bg-foreground/[0.02] -mx-4 px-4 py-4 rounded" : undefined;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2">
       <div className="md:pr-8">
-        {en && <SectionBlock id={enId} text={en} className={extraClass} />}
+        {en && <SectionBlock id={enId} text={en} className={extraClass} dropcap={dropcap} />}
       </div>
       {la && (
         <div className="md:border-l md:border-border/20 md:pl-8 mt-6 md:mt-0 border-t border-border/[0.12] pt-6 md:border-t-0 md:pt-0">
@@ -125,7 +127,7 @@ export function ArticleView({ article }: { article: Article }) {
 
       {hasSC && (
         <>
-          <div className="my-9 h-px bg-border/25" />
+          <div className="divider-ornamental my-9" />
           <SectionPairRow
             en={article.sed_contra ?? null}
             la={article.sed_contra_la ?? null}
@@ -136,19 +138,20 @@ export function ArticleView({ article }: { article: Article }) {
 
       {hasResp && (
         <>
-          <div className="my-9 h-px bg-border/25" />
+          <div className="divider-ornamental my-9" />
           <SectionPairRow
             en={article.respondeo ?? null}
             la={article.respondeo_la ?? null}
             enId="respondeo"
             respondeoStyle
+            dropcap
           />
         </>
       )}
 
       {maxReplies > 0 && (
         <>
-          <div className="my-9 h-px bg-border/25" />
+          <div className="divider-ornamental my-9" />
           <div className="space-y-9">
             {Array.from({ length: maxReplies }, (_, i) => {
               const en = article.replies[i];

@@ -169,3 +169,39 @@ textarea:focus-visible {
   outline: 2px solid hsl(var(--ring) / 0.35);
   outline-offset: 1px;
 }
+
+/* ── Medieval ornamental styles ─────────────────── */
+
+.divider-ornamental {
+  position: relative;
+  height: 1px;
+  background: hsl(var(--border) / 0.3);
+  border: none;
+}
+
+.divider-ornamental::after {
+  content: "✦";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: hsl(var(--background));
+  padding: 0 0.55em;
+  font-size: 0.5rem;
+  color: hsl(var(--border) / 0.6);
+  line-height: 1;
+}
+
+.rubric-label {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.04em;
+}
+
+.article-dropcap p::first-letter {
+  float: left;
+  font-family: var(--font-cardo);
+  font-size: 3.2em;
+  line-height: 0.78;
+  margin: 0.06em 0.1em 0 0;
+  color: hsl(var(--foreground) / 0.45);
+}
