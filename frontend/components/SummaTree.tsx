@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
-import { ChevronRight, Search, X } from "lucide-react";
+import { ChevronRight, Search, X, ChevronDown } from "lucide-react";
 import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { cn } from "@/lib/utils";
@@ -149,6 +149,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
   { selected, onSelect },
   ref
 ) {
+  const [book, setBook] = useState<"theologica" | "contra-gentiles">("theologica");
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
@@ -193,7 +194,18 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 px-2 py-2 border-b border-border">
+      <div className="shrink-0 px-2 pt-2 pb-1.5 border-b border-border flex flex-col gap-1.5">
+        <div className="relative">
+          <select
+            value={book}
+            onChange={(e) => { setBook(e.target.value as "theologica" | "contra-gentiles"); setFilter(""); }}
+            className="w-full appearance-none pl-3 pr-7 py-2 bg-secondary border border-border rounded text-[12px] text-foreground focus:outline-none focus:border-foreground/25 transition-colors cursor-pointer"
+          >
+            <option value="theologica">Summa Theologica</option>
+            <option value="contra-gentiles">Summa Contra Gentiles</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/45 pointer-events-none" />
+        </div>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground/45 pointer-events-none" />
           <input
@@ -217,7 +229,12 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain py-1 select-none">
 
-        {filterTree !== null ? (
+        {book === "contra-gentiles" ? (
+          <div className="px-4 py-8 flex flex-col gap-2">
+            <p className="text-[12px] text-foreground/70 font-cardo italic">Summa Contra Gentiles</p>
+            <p className="text-[11px] text-muted-foreground/50 leading-relaxed">Content coming soon.</p>
+          </div>
+        ) : filterTree !== null ? (
           filterTree.length === 0 ? (
             <p className="px-3 py-5 text-[11px] text-muted-foreground/50 italic font-cardo">No results</p>
           ) : (
@@ -345,5 +362,6 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
     </div>
   );
 });
+
 
 export default SummaTree;
