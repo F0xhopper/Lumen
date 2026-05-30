@@ -1,4 +1,4 @@
-app = "lumen-backend"
+app = "lumen-api-prod"
 primary_region = "iad"
 
 [build]

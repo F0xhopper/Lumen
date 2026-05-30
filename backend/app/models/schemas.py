@@ -22,6 +22,15 @@ class PassageResult(BaseModel):
     source_url: str
 
 
+class QuestionResult(BaseModel):
+    rank: int
+    score: float
+    part_id: str
+    part_abbr: str
+    question_n: int
+    question_title: str
+
+
 class ArticleResponse(BaseModel):
     part_id: str
     part_abbr: str

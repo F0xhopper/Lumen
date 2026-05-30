@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { Passage } from "@/lib/api";
+import type { Passage, QuestionMatch } from "@/lib/api";
+import { PART_ID_TO_SLUG } from "@/lib/navigation";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
   const tokens = query
@@ -25,6 +26,36 @@ function highlightTerms(text: string, query: string): React.ReactNode {
         )
       )}
     </>
+  );
+}
+
+export function QuestionJumpList({ matches }: { matches: QuestionMatch[] }) {
+  return (
+    <div className="mb-8">
+      <p className="font-inter text-[10px] tracking-widest uppercase text-muted-foreground/35 mb-2">
+        Questions
+      </p>
+      <div className="flex flex-col">
+        {matches.map((m) => {
+          const slug = PART_ID_TO_SLUG[m.part_id];
+          const href = slug ? `/${slug}/${m.question_n}` : null;
+          const inner = (
+            <span className="font-inter text-[11px] tracking-wide text-muted-foreground/55 hover:text-foreground/75 transition-colors">
+              {m.part_abbr}&nbsp;&nbsp;Q.{m.question_n}
+              <span className="mx-2 text-muted-foreground/25">·</span>
+              <span className="font-cardo italic text-[13px]">{m.question_title}</span>
+            </span>
+          );
+          return href ? (
+            <Link key={m.rank} href={href} className="block -mx-3 px-3 py-1.5 rounded transition-colors hover:bg-foreground/[0.025]">
+              {inner}
+            </Link>
+          ) : (
+            <span key={m.rank} className="px-3 py-1.5">{inner}</span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

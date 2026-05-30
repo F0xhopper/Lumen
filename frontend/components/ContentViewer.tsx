@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { getAdjacentArticles, type SelectedNode } from "@/lib/summa-full";
+import { getAdjacentArticles, SUMMA_PARTS, type SelectedNode } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
-import { fetchArticle, fetchPassages } from "@/lib/api";
-import { PART_ABBR_TO_PART_ID, nodeUrl } from "@/lib/navigation";
+import { fetchArticle, fetchPassages, fetchQuestionMatches } from "@/lib/api";
+import { PART_ABBR_TO_PART_ID, PART_ID_TO_SLUG, nodeUrl } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { ArticleView } from "./ArticleView";
-import { PassageList } from "./PassageList";
+import { PassageList, QuestionJumpList } from "./PassageList";
 import { HighlightMenu, type HighlightState } from "./HighlightMenu";
 
 function ContentHeader({
@@ -124,8 +125,9 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     ? getAdjacentArticles(selected)
     : { prev: null, next: null };
 
-  const isArticleMode = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
-  const isSearchMode  = Boolean(searchQuery.trim());
+  const isArticleMode  = Boolean(selected?.articleN !== undefined && !searchQuery.trim());
+  const isQuestionMode = Boolean(selected && selected.articleN === undefined && !searchQuery.trim());
+  const isSearchMode   = Boolean(searchQuery.trim());
 
   const resolvedPartId = selected
     ? (PART_ABBR_TO_PART_ID[selected.partAbbr] ?? selected.partId)
@@ -151,6 +153,14 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
   } = useQuery({
     queryKey: ["passages", trimmedQuery],
     queryFn: () => fetchPassages(trimmedQuery),
+    enabled: isSearchMode,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const { data: questionMatches = [] } = useQuery({
+    queryKey: ["question-matches", trimmedQuery],
+    queryFn: () => fetchQuestionMatches(trimmedQuery),
     enabled: isSearchMode,
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -261,7 +271,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-7 sm:py-7">
-        <div className={cn("mx-auto", isSearchMode ? "max-w-prose" : "w-full")}>
+        <div className={cn("mx-auto", isSearchMode || isQuestionMode ? "max-w-prose" : "w-full")}>
           {isLoading && (
             <div className="flex items-center gap-2.5 text-muted-foreground py-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -283,7 +293,47 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
             <ArticleView article={article} />
           )}
 
-          {!isLoading && !error && isSearchMode && passages.length === 0 && (
+          {isQuestionMode && selected && (() => {
+            const slug = PART_ID_TO_SLUG[selected.partId] ?? PART_ID_TO_SLUG[PART_ABBR_TO_PART_ID[selected.partAbbr]];
+            const articleTitles = SUMMA_ARTICLE_TITLES[selected.partId]?.[selected.questionN] ?? [];
+            const articleCount = articleTitles.length ||
+              (SUMMA_PARTS.find(p => p.id === selected.partId)
+                ?.treatises.flatMap(t => t.questions)
+                .find(q => q.n === selected.questionN)?.articles ?? 0);
+            return (
+              <div className="space-y-1">
+                <p className="font-inter text-[10px] tracking-widest uppercase text-muted-foreground/35 mb-4">
+                  {articleCount} {articleCount === 1 ? "article" : "articles"}
+                </p>
+                {Array.from({ length: articleCount }, (_, i) => i + 1).map((n) => {
+                  const title = articleTitles.find(a => a.n === n)?.title;
+                  return (
+                    <Link
+                      key={n}
+                      href={`/${slug}/${selected.questionN}/${n}`}
+                      className="block -mx-3 px-3 py-2 rounded transition-colors hover:bg-foreground/[0.025] group"
+                    >
+                      <span className="font-inter text-[11px] text-muted-foreground/45 group-hover:text-muted-foreground/60 transition-colors">
+                        A.{n}
+                        {title && (
+                          <>
+                            <span className="mx-2 text-muted-foreground/25">·</span>
+                            <span className="font-cardo italic text-[13px] text-foreground/70 group-hover:text-foreground/85 transition-colors">{title}</span>
+                          </>
+                        )}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {!isLoading && isSearchMode && questionMatches.length > 0 && (
+            <QuestionJumpList matches={questionMatches} />
+          )}
+
+          {!isLoading && !error && isSearchMode && passages.length === 0 && questionMatches.length === 0 && (
             <p className="font-cardo italic text-[13px] text-muted-foreground/40">
               No passages retrieved. The index may not contain this text yet.
             </p>

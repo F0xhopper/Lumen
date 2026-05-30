@@ -80,6 +80,28 @@ export interface QueryResponse {
   agent_steps: number;
 }
 
+export interface QuestionMatch {
+  rank: number;
+  score: number;
+  part_id: string;
+  part_abbr: string;
+  question_n: number;
+  question_title: string;
+}
+
+export async function fetchQuestionMatches(query: string, topK = 5): Promise<QuestionMatch[]> {
+  try {
+    const res = await fetch(
+      `/api/question-search?q=${encodeURIComponent(query.trim())}&top_k=${topK}`,
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchArticle(
   partId: string,
   questionN: number,

@@ -8,7 +8,7 @@ from app.core.dependencies import init_db, close_db
 from app.services.retrieval import init_retrieval
 from app.api.middleware.cors import add_cors_middleware
 from app.api.middleware.error_handlers import add_error_handlers
-from app.api.routes import root, query, passages, article, articles, status
+from app.api.routes import root, query, passages, article, articles, status, question_search
 from app.repositories.article_repo import ensure_schema
 
 setup_logging(settings.LOG_LEVEL)
@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(article.router)
     app.include_router(articles.router)
     app.include_router(status.router)
+    app.include_router(question_search.router)
 
     return app
 

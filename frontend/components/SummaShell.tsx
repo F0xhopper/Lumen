@@ -122,10 +122,6 @@ export default function SummaShell() {
       "]": () => { if (nextArticle) router.push(nodeUrl(nextArticle)); },
 
       "/": () => { inputRef.current?.focus(); inputRef.current?.select(); },
-      f: () => {
-        if (!isMobile) setLeftOpen(true);
-        setTimeout(() => summaTreeRef.current?.focusFilter(), 220);
-      },
 
       b: () => setLeftOpen((o) => !o),
 

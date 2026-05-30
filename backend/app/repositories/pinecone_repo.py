@@ -21,9 +21,10 @@ class PineconeRepository:
         sparse_vector: dict | None,
         top_k: int,
         alpha: float = 0.7,
+        namespace: str | None = None,
     ) -> list[PineconeMatch]:
         kwargs = dict(
-            namespace=settings.PINECONE_NAMESPACE,
+            namespace=namespace or settings.PINECONE_NAMESPACE,
             top_k=top_k,
             include_metadata=True,
         )
