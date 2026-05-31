@@ -319,10 +319,13 @@ export default function SummaShell() {
                 </div>
               )}
               {sidebarTab === "notes" && (() => {
-                const noteKey = selected
-                  ? `${selected.partId}-${selected.questionN}-${selected.articleN ?? "q"}`
-                  : null;
-                return noteKey ? (
+                if (!selected) return (
+                  <div className="flex-1 flex items-center justify-center p-6">
+                    <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">Open an article to take notes</p>
+                  </div>
+                );
+                const noteKey = `${selected.partId}-${selected.questionN}-${selected.articleN ?? "q"}`;
+                return (
                   <div className="flex-1 flex flex-col p-3 gap-2">
                     <p className="font-cardo italic text-[11px] text-muted-foreground/40 leading-tight">
                       {selected.partAbbr} Q.{selected.questionN}{selected.articleN ? ` A.${selected.articleN}` : ""}
@@ -333,10 +336,6 @@ export default function SummaShell() {
                       value={notes[noteKey] ?? ""}
                       onChange={(e) => updateNote(noteKey, e.target.value)}
                     />
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center p-6">
-                    <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">Open an article to take notes</p>
                   </div>
                 );
               })()}
