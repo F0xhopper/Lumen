@@ -4,14 +4,14 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "re
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getAdjacentArticles, SUMMA_PARTS, type SelectedNode } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { fetchArticle, fetchPassages, fetchQuestionMatches } from "@/lib/api";
 import { PART_ABBR_TO_PART_ID, PART_ID_TO_SLUG, nodeUrl } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { ArticleView } from "./ArticleView";
-import { PassageList, QuestionJumpList } from "./PassageList";
+import { PassageList, QuestionJumpList, SearchLoadingSkeleton } from "./PassageList";
 import { HighlightMenu, type HighlightState } from "./HighlightMenu";
 
 function ContentHeader({
@@ -272,12 +272,11 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-7 sm:py-7">
         <div className={cn("mx-auto", isSearchMode || isQuestionMode ? "max-w-prose" : "w-full")}>
-          {isLoading && (
-            <div className="flex items-center gap-2.5 text-muted-foreground py-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span className="font-inter text-[11px] tracking-widest uppercase">
-                {isArticleMode ? "Loading article…" : "Retrieving passages…"}
-              </span>
+          {isLoading && isSearchMode && <SearchLoadingSkeleton />}
+
+          {isLoading && isArticleMode && (
+            <div className="py-2">
+              <span className="text-[9px] text-muted-foreground/20 animate-pulse select-none">✦</span>
             </div>
           )}
 

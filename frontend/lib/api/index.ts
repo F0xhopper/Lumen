@@ -107,9 +107,7 @@ export async function fetchArticle(
   questionN: number,
   articleN: number,
 ): Promise<Article> {
-  const res = await fetch(
-    `/api/article?part_id=${encodeURIComponent(partId)}&question_n=${questionN}&article_n=${articleN}`,
-  );
+  const res = await fetch(`/data/articles/${partId}-q${questionN}-a${articleN}.json`);
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }

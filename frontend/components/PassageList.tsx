@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { Passage, QuestionMatch } from "@/lib/api";
 import { PART_ID_TO_SLUG } from "@/lib/navigation";
@@ -26,6 +28,44 @@ function highlightTerms(text: string, query: string): React.ReactNode {
         )
       )}
     </>
+  );
+}
+
+const SKELETON_WIDTHS: string[][] = [
+  ["100%", "92%", "97%", "85%", "78%"],
+  ["100%", "88%", "94%", "91%", "68%"],
+  ["100%", "95%", "82%", "89%", "74%"],
+];
+
+export function SearchLoadingSkeleton() {
+  return (
+    <div className="space-y-9">
+      {SKELETON_WIDTHS.map((lines, cardIndex) => (
+        <div
+          key={cardIndex}
+          className="space-y-3"
+          style={{ opacity: 1 - cardIndex * 0.2 }}
+        >
+          <div className="flex items-center gap-2">
+            <div className="h-[7px] w-14 rounded-sm bg-foreground/[0.06] animate-pulse" />
+            <div className="h-[7px] w-0.5 rounded-sm bg-foreground/[0.04]" />
+            <div className="h-[7px] w-28 rounded-sm bg-foreground/[0.05] animate-pulse" />
+          </div>
+          <div className="space-y-[9px]">
+            {lines.map((w, lineIndex) => (
+              <div
+                key={lineIndex}
+                className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse"
+                style={{
+                  width: w,
+                  animationDelay: `${(cardIndex * lines.length + lineIndex) * 60}ms`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

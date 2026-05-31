@@ -10,7 +10,7 @@ from app.services import embedding, reranker, search
 
 logger = get_logger(__name__)
 
-_RERANK_FETCH_MULTIPLIER = 4
+_RERANK_FETCH_MULTIPLIER = 2
 _RERANK_FETCH_MAX = 40
 
 

@@ -14,6 +14,7 @@ import {
   Clock,
   Sun,
   Moon,
+  PenLine,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
@@ -83,11 +84,25 @@ export default function SummaShell() {
   const [previousSelected, setPreviousSelected] = useState<SelectedNode | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "history">("browse");
+  const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "notes" | "history">("browse");
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("lumen-notes");
+      if (saved) setNotes(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const updateNote = (key: string, value: string) => {
+    const updated = { ...notes, [key]: value };
+    setNotes(updated);
+    try { localStorage.setItem("lumen-notes", JSON.stringify(updated)); } catch {}
+  };
 
   useEffect(() => {
     if (isMobile && !leftOpen) {
@@ -276,6 +291,7 @@ export default function SummaShell() {
                 {([
                   { id: "browse",    Icon: BookOpen, label: "Browse"  },
                   { id: "bookmarks", Icon: Bookmark, label: "Saved"   },
+                  { id: "notes",     Icon: PenLine,  label: "Notes"   },
                   { id: "history",   Icon: Clock,    label: "History" },
                 ] as const).map(({ id, Icon, label }) => (
                   <button
@@ -302,6 +318,28 @@ export default function SummaShell() {
                   <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No bookmarks yet</p>
                 </div>
               )}
+              {sidebarTab === "notes" && (() => {
+                const noteKey = selected
+                  ? `${selected.partId}-${selected.questionN}-${selected.articleN ?? "q"}`
+                  : null;
+                return noteKey ? (
+                  <div className="flex-1 flex flex-col p-3 gap-2">
+                    <p className="font-cardo italic text-[11px] text-muted-foreground/40 leading-tight">
+                      {selected.partAbbr} Q.{selected.questionN}{selected.articleN ? ` A.${selected.articleN}` : ""}
+                    </p>
+                    <textarea
+                      className="flex-1 w-full bg-transparent resize-none text-[12px] font-cardo text-foreground/80 placeholder:text-muted-foreground/25 focus:outline-none leading-relaxed"
+                      placeholder="Write a note…"
+                      value={notes[noteKey] ?? ""}
+                      onChange={(e) => updateNote(noteKey, e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center p-6">
+                    <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">Open an article to take notes</p>
+                  </div>
+                );
+              })()}
               {sidebarTab === "history" && (
                 <div className="flex-1 flex items-center justify-center p-6">
                   <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No history yet</p>

@@ -19,6 +19,8 @@ class Settings:
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "lumen-summa")
     PINECONE_NAMESPACE: str = os.getenv("PINECONE_NAMESPACE", "summa")
+    PINECONE_RERANKER_MODEL: str = os.getenv("PINECONE_RERANKER_MODEL", "bge-reranker-v2-m3")
+    USE_PINECONE_RERANKER: bool = os.getenv("USE_PINECONE_RERANKER", "true").lower() == "true"
 
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     DATABASE_SSL: bool = os.getenv("DATABASE_SSL", "false").lower() == "true"

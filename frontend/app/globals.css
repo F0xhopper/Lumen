@@ -191,6 +191,7 @@ textarea:focus-visible {
   letter-spacing: 0.04em;
 }
 
+
 .article-dropcap p::first-letter {
   float: left;
   font-family: var(--font-cardo);

@@ -51,7 +51,7 @@ PART_PAGES: dict[str, list[str]] = {
 }
 
 TITLE_RE = re.compile(
-    r"q\.\s*(\d+)\s+a\.\s*(\d+)\s+(arg\.\s*\d+|s\.\s*c\.|co\.|ad\s*\d+|pr\.)",
+    r"q\.\s*(\d+)(?:\s+a\.\s*(\d+))?\s+(arg\.\s*\d+|s\.\s*c\.|co\.|ad\s*\d+|pr\.)",
     re.IGNORECASE,
 )
 ARG_N_RE = re.compile(r"arg\.\s*(\d+)", re.IGNORECASE)
@@ -90,7 +90,7 @@ def parse_page(html: str, part_id: str, source_url: str) -> list[dict]:
             continue
 
         q_n      = int(m.group(1))
-        a_n      = int(m.group(2))
+        a_n      = int(m.group(2)) if m.group(2) else 1
         sec_code = m.group(3).strip().lower()
         key      = (q_n, a_n)
 
