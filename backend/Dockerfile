@@ -24,7 +24,7 @@ COPY --from=builder /install /usr/local
 COPY app/ app/
 COPY data/ data/
 
-RUN python -c "import nltk; nltk.download('punkt_tab', download_dir='/app/nltk_data', quiet=True)"
+RUN python -c "import nltk; nltk.download('punkt_tab', download_dir='/app/nltk_data', quiet=True); nltk.download('stopwords', download_dir='/app/nltk_data', quiet=True); nltk.download('punkt', download_dir='/app/nltk_data', quiet=True)"
 
 RUN useradd --no-create-home --shell /bin/false appuser \
     && chown -R appuser:appuser /app
