@@ -57,6 +57,7 @@ def _pinecone_rerank_sync(query: str, texts: list[str]) -> list[float]:
         documents=texts,
         top_n=len(texts),
         return_documents=False,
+        parameters={"truncate": "END"},
     )
     scores_by_index = {r.index: r.score for r in result.data}
     return [scores_by_index.get(i, 0.0) for i in range(len(texts))]
