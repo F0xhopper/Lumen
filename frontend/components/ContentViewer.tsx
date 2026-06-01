@@ -347,6 +347,13 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
       {highlight && (
         <HighlightMenu
           highlight={highlight}
+          citation={
+            selected?.articleN !== undefined
+              ? `ST ${selected.partAbbr}, q.${selected.questionN}, a.${selected.articleN}`
+              : selected
+              ? `ST ${selected.partAbbr}, q.${selected.questionN}`
+              : undefined
+          }
           onNote={onHighlightNote ?? (() => {})}
           onSearch={onHighlightSearch ?? (() => {})}
           onAddToChat={onHighlightAddToChat ?? (() => {})}

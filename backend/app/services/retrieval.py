@@ -19,6 +19,41 @@ def init_retrieval() -> None:
     reranker.load_reranker()
 
 
+def _rrf_merge(
+    fts: list[PassageResult],
+    pinecone: list[PineconeMatch],
+    k: int = 60,
+) -> list[PassageResult]:
+    """Reciprocal Rank Fusion — rank-based merge, immune to score-scale differences."""
+    rrf_scores: dict[tuple, float] = {}
+    fts_by_key: dict[tuple, PassageResult] = {}
+    pine_by_key: dict[tuple, PineconeMatch] = {}
+
+    for rank, p in enumerate(fts, 1):
+        key = (p.part_abbr, p.question_n, p.article_n, p.section)
+        rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (k + rank)
+        fts_by_key[key] = p
+
+    for rank, m in enumerate(pinecone, 1):
+        meta = m.metadata
+        key = (
+            meta.get("part_abbr", ""),
+            int(meta.get("question_n", 0)),
+            int(meta.get("article_n", 0)),
+            meta.get("section", "body"),
+        )
+        rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (k + rank)
+        pine_by_key.setdefault(key, m)
+
+    results = []
+    for key, score in sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True):
+        if key in fts_by_key:
+            results.append(fts_by_key[key].model_copy(update={"score": round(score, 6)}))
+        else:
+            results.append(_match_to_passage(pine_by_key[key], 0, round(score, 6)))
+    return results
+
+
 def _match_to_passage(match: PineconeMatch, rank: int, score: float) -> PassageResult:
     meta = match.metadata
     return PassageResult(
@@ -114,12 +149,13 @@ async def combined_search(
             _match_to_passage(m, 0, s)
             for m, s in zip(unique_pinecone, pine_scores)
         ]
+        results = [r for r in results if r.score >= min_score]
+        results.sort(key=lambda r: r.score, reverse=True)
     else:
-        exact_passages = [p.model_copy(update={"score": 0.85}) for p in exact_passages]
-        results = exact_passages + [
-            _match_to_passage(m, 0, m.score) for m in unique_pinecone
-        ]
+        # RRF over full lists: rank-based, so FTS and Pinecone score scales don't matter.
+        # Items appearing in both lists get both rank contributions summed — cross-list
+        # agreement is strong evidence of relevance. min_score is not applied because
+        # RRF scores are small fractions (~1/61 max) and are not comparable to reranker scores.
+        results = _rrf_merge(exact_passages, pinecone_matches)
 
-    results = [r for r in results if r.score >= min_score]
-    results.sort(key=lambda r: r.score, reverse=True)
     return [r.model_copy(update={"rank": i}) for i, r in enumerate(results[:top_k], 1)]

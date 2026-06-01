@@ -32,7 +32,7 @@ const ArticleRow = memo(({ n, title, isSelected, onClick }: {
     onClick={onClick}
     data-selected={isSelected ? "" : undefined}
     className={cn(
-      "w-full text-left px-4 py-3 md:py-2 rounded transition-colors flex items-start gap-1.5 border-l-2",
+      "w-full text-left px-4 py-1.5 rounded transition-colors flex items-start gap-1.5 border-l-2",
       isSelected
         ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
         : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"

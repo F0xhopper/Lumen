@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import asyncio
 import json
 import sys
@@ -32,20 +33,26 @@ def article_url(part_id: str, question_n: int, article_n: int) -> str:
     return f"/{slug}/{question_n}/{article_n}"
 
 
+def make_embed_text(question_title: str, article_title: str, label: str, body: str) -> str:
+    return f"{question_title} — {article_title} ({label})\n\n{body}"
+
+
 def expand_sections(row: asyncpg.Record) -> list[dict]:
     pid = row["part_id"]
     qn  = row["question_n"]
     an  = row["article_n"]
     base_id = f"{pid}-q{qn:04d}-a{an:02d}"
     base_url = article_url(pid, qn, an)
+    q_title = row["question_title"]
+    a_title = row["article_title"]
     common = {
-        "part_id":       pid,
-        "part_abbr":     row["part_abbr"],
-        "question_n":    qn,
-        "question_title": row["question_title"],
-        "article_n":     an,
-        "article_title": row["article_title"],
-        "source_url":    row["source_url"] or "",
+        "part_id":        pid,
+        "part_abbr":      row["part_abbr"],
+        "question_n":     qn,
+        "question_title": q_title,
+        "article_n":      an,
+        "article_title":  a_title,
+        "source_url":     row["source_url"] or "",
     }
 
     chunks = []
@@ -53,13 +60,15 @@ def expand_sections(row: asyncpg.Record) -> list[dict]:
     def add(vec_id, text, section, label, fragment):
         if not text or not text.strip():
             return
+        body = text.strip()[:4000]
         chunks.append({
             "id":            vec_id,
-            "text":          text.strip()[:4000],
+            "text":          body,
+            "embed_text":    make_embed_text(q_title, a_title, label, body),
             "section":       section,
             "section_label": label,
             "url_fragment":  fragment,
-            "metadata":      {**common, "text": text.strip()[:4000],
+            "metadata":      {**common, "text": body,
                               "section": section, "section_label": label,
                               "url_fragment": fragment,
                               "article_url": base_url},
@@ -124,11 +133,23 @@ def embed_texts(client: OpenAI, texts: list[str]) -> list[list[float]]:
 
 
 async def main():
+    parser = argparse.ArgumentParser(description="Index Summa articles into Pinecone.")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Index all articles regardless of pinecone_indexed flag (use when switching indexes).",
+    )
+    args = parser.parse_args()
+
     for var, val in [("DATABASE_URL", settings.DATABASE_URL),
                      ("PINECONE_API_KEY", settings.PINECONE_API_KEY),
                      ("OPENAI_API_KEY", settings.OPENAI_API_KEY)]:
         if not val:
             print(f"ERROR: {var} not set"); sys.exit(1)
+
+    print(f"Target index: '{settings.PINECONE_INDEX_NAME}'")
+    if args.full:
+        print("--full mode: indexing all articles (ignoring pinecone_indexed flag)")
 
     pool  = await asyncpg.create_pool(settings.DATABASE_URL)
     pc    = Pinecone(api_key=settings.PINECONE_API_KEY)
@@ -137,13 +158,14 @@ async def main():
     create_index_if_missing(pc)
     index = pc.Index(settings.PINECONE_INDEX_NAME)
 
+    where = "" if args.full else "WHERE pinecone_indexed = FALSE"
     async with pool.acquire() as conn:
         all_rows = await conn.fetch(
-            """SELECT id, part_id, part_abbr, question_n, question_title,
+            f"""SELECT id, part_id, part_abbr, question_n, question_title,
                       article_n, article_title, body,
                       sed_contra, respondeo, objections, replies, source_url
                FROM summa_articles
-               WHERE pinecone_indexed = FALSE
+               {where}
                ORDER BY part_id, question_n, article_n"""
         )
 
@@ -155,24 +177,26 @@ async def main():
 
     print(f"{len(all_chunks)} section vectors total.")
 
+    # BM25 is fit on clean display text — no prefix — so query-time sparse
+    # encoding stays in the same token space as the indexed documents.
     bm25 = fit_bm25([c["text"] for c in all_chunks])
 
     total_upserted = 0
-    article_ids_done: list[int] = []
-    seen_article_ids: set[int] = set()
 
     for i in range(0, len(all_chunks), UPSERT_BATCH):
         batch = all_chunks[i: i + UPSERT_BATCH]
-        texts = [c["text"] for c in batch]
 
+        # Dense embedding uses the contextualized text (question + article title prefix).
+        embed_inputs = [c["embed_text"] for c in batch]
         dense_vecs = []
-        for j in range(0, len(texts), EMBED_BATCH):
-            sub = texts[j: j + EMBED_BATCH]
+        for j in range(0, len(embed_inputs), EMBED_BATCH):
+            sub = embed_inputs[j: j + EMBED_BATCH]
             dense_vecs.extend(embed_texts(oai, sub))
-            if j + EMBED_BATCH < len(texts):
+            if j + EMBED_BATCH < len(embed_inputs):
                 time.sleep(0.3)
 
-        sparse_vecs = bm25.encode_documents(texts)
+        # Sparse encoding uses clean text to match BM25 fit corpus.
+        sparse_vecs = bm25.encode_documents([c["text"] for c in batch])
 
         vectors = [
             {
@@ -197,7 +221,7 @@ async def main():
             )
 
     await pool.close()
-    print(f"\nDone. {total_upserted} section vectors in Pinecone.")
+    print(f"\nDone. {total_upserted} section vectors in '{settings.PINECONE_INDEX_NAME}'.")
 
 
 if __name__ == "__main__":

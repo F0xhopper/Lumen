@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Search, MessageSquare } from "lucide-react";
+import { Bookmark, Search, MessageSquare, Quote } from "lucide-react";
 
 export interface HighlightState {
   text: string;
@@ -17,18 +17,20 @@ type HighlightAction = {
 
 export function HighlightMenu({
   highlight,
+  citation,
   onNote,
   onSearch,
   onAddToChat,
   onDismiss,
 }: {
   highlight: HighlightState;
+  citation?: string;
   onNote: (text: string) => void;
   onSearch: (text: string) => void;
   onAddToChat: (text: string) => void;
   onDismiss: () => void;
 }) {
-  const W = 186;
+  const W = citation ? 248 : 186;
   const GAP = 8;
 
   const anchorX = Number.isFinite(highlight.mouseX)
@@ -69,10 +71,23 @@ export function HighlightMenu({
         onDismiss();
       },
     },
+    ...(citation
+      ? [
+          {
+            icon: Quote,
+            label: "Cite",
+            onClick: () => {
+              navigator.clipboard.writeText(`"${highlight.text}" (${citation})`).catch(() => {});
+              onDismiss();
+            },
+          },
+        ]
+      : []),
   ];
 
   return (
     <div
+      data-highlight-menu
       onMouseDown={(e) => e.preventDefault()}
       className="fixed z-50 flex items-stretch bg-background border border-border/60 rounded shadow-md shadow-black/30 divide-x divide-border/40 overflow-hidden"
       style={{ left, top, width: W }}
