@@ -6,7 +6,6 @@ import {
 } from "react";
 import { Send, Loader2, RotateCcw, PanelRightClose } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
-import CitationChip from "./CitationChip";
 import {
   ContextArgChip,
   SentContextArg,
@@ -266,7 +265,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
                 {msg.content}
               </div>
             ) : (
-              <div className="space-y-2.5 border-l-2 border-border/60 pl-3">
+              <div className="space-y-2.5">
                 <div className="font-cardo text-[13px] text-foreground/85 leading-relaxed [&_.markdown]:font-cardo [&_.markdown]:text-[13px] [&_.markdown_p]:mb-2 [&_.markdown_p]:leading-relaxed [&_.markdown_blockquote]:border-muted-foreground/30">
                   <MarkdownRenderer
                     content={msg.content}
@@ -276,11 +275,21 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
                 </div>
 
                 {msg.citations && msg.citations.length > 0 && (
-                  <div className="pt-1.5 space-y-1.5">
-                    <p className="font-inter text-[9px] tracking-[0.08em] uppercase text-muted-foreground/35">Sources</p>
-                    <div className="flex flex-wrap gap-1">
+                  <div className="pt-2 mt-0.5 border-t border-border/40">
+                    <p className="font-inter text-[9px] tracking-[0.12em] uppercase text-muted-foreground/35 mb-1.5">Citations</p>
+                    <div className="space-y-0.5">
                       {msg.citations.map((c) => (
-                        <CitationChip key={c.ref} citation={c} onNavigate={handleNavigate} />
+                        <button
+                          key={c.ref}
+                          onClick={() => handleNavigate(c.url_path)}
+                          title={`${c.question_title} — ${c.article_title}`}
+                          className="w-full flex items-baseline gap-2 text-left group cursor-pointer hover:bg-foreground/[0.04] px-1.5 py-1 -mx-1.5 rounded transition-colors"
+                        >
+                          <span className="shrink-0 font-mono text-[9px] text-muted-foreground/40 group-hover:text-muted-foreground/60">[{c.ref}]</span>
+                          <span className="flex-1 font-cardo text-[11px] text-foreground/55 group-hover:text-foreground/80 leading-tight min-w-0 truncate">
+                            ST {c.part_abbr} Q.{c.question_n} A.{c.article_n} — {c.section_label}
+                          </span>
+                        </button>
                       ))}
                     </div>
                   </div>

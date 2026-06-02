@@ -121,7 +121,7 @@ export default function MarkdownRenderer({
           blockquote({ children, ...props }) {
             return (
               <blockquote
-                className="border-l-2 border-muted-foreground/40 pl-4 italic my-4 text-muted-foreground"
+                className="border-l-[3px] border-foreground/20 bg-foreground/[0.04] pl-4 pr-3 py-2.5 my-4 rounded-r-sm font-cardo text-foreground/80 not-italic [&_p]:mb-1 [&_p:last-child]:mb-0"
                 {...props}
               >
                 {children}
@@ -141,6 +141,20 @@ export default function MarkdownRenderer({
             return <h2 className="text-base font-semibold mb-3 mt-5 text-foreground tracking-tight" {...props}>{children}</h2>;
           },
           h3({ children, ...props }) {
+            const label = typeof children === "string"
+              ? children
+              : Array.isArray(children) ? children.map((c) => (typeof c === "string" ? c : "")).join("") : "";
+            const isSummaSection = /^(RESPONDEO|SED CONTRA|OBJ\.\s*\d|AD\s+\d|OBIECT)/i.test(label.trim());
+            if (isSummaSection) {
+              return (
+                <h3
+                  className="font-inter text-[9px] tracking-[0.15em] uppercase text-muted-foreground/55 mt-6 mb-2.5 pb-1.5 border-b border-border/50 first:mt-1"
+                  {...props}
+                >
+                  {children}
+                </h3>
+              );
+            }
             return <h3 className="text-sm font-semibold mb-2 mt-4 text-foreground" {...props}>{children}</h3>;
           },
           p({ children, ...props }) {

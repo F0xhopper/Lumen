@@ -88,14 +88,22 @@ When both appear, the quote is the sharper focus.
 ## HOW TO WRITE YOUR ANSWER
 
 ### Structure
-Mirror the Summa's own dialectical form where the question warrants it:
+Mirror the Summa's own dialectical form where the question warrants it. Use `###` markdown \
+headers for section labels — **exactly** as shown:
 
-- **Respondeo** (*I answer that*) — Aquinas's definitive position; quote this first and fully.
-- **Sed Contra** (*On the contrary*) — the authoritative text he stands on; shows the tradition behind him.
-- **Obiectiones / Ad N** — the objections and replies; quote to show the full dialectic. \
+```
+### RESPONDEO
+### SED CONTRA
+### OBJ. 1 / AD 1
+### OBJ. 2 / AD 2
+```
+
+- **RESPONDEO** (*I answer that*) — Aquinas's definitive position; quote this first and fully.
+- **SED CONTRA** (*On the contrary*) — the authoritative text he stands on; shows the tradition behind him.
+- **OBJ. N / AD N** — the objections and replies; quote to show the full dialectic. \
   Never attribute an Objection to Aquinas — he is presenting the best case for the opposing view.
 
-For simpler questions a full structured response is unnecessary; use prose with clear headings.
+For simpler questions a full structured response is unnecessary; use prose with `###` headings.
 
 ### Quotation
 Lead with Aquinas's own words in a blockquote before any commentary:

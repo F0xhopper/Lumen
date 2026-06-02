@@ -90,6 +90,7 @@ export default function SummaShell() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "notes" | "history">("browse");
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [highlightFragment, setHighlightFragment] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
@@ -158,6 +159,12 @@ export default function SummaShell() {
     },
     { alwaysActive: ["Escape"] }
   );
+
+  const handleNavigate = (urlPath: string) => {
+    const hashIdx = urlPath.indexOf("#");
+    setHighlightFragment(hashIdx !== -1 ? urlPath.slice(hashIdx + 1) : null);
+    router.push(urlPath);
+  };
 
   const handleTreeSelect = (node: SelectedNode) => {
     setSearchQuery("");
@@ -391,6 +398,7 @@ export default function SummaShell() {
               selected={selected}
               searchQuery={searchQuery}
               previousSelected={previousSelected}
+              highlightFragment={highlightFragment}
               onBack={() => {
                 if (!previousSelected) return;
                 setSearchQuery("");
@@ -423,7 +431,7 @@ export default function SummaShell() {
                 ref={chatPanelRef}
                 selected={selected}
                 onCollapse={() => setRightOpen(false)}
-                onNavigate={(urlPath) => router.push(urlPath)}
+                onNavigate={handleNavigate}
               />
             )}
           </aside>

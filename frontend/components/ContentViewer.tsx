@@ -89,6 +89,7 @@ interface ContentViewerProps {
   selected: SelectedNode | null;
   searchQuery: string;
   previousSelected?: SelectedNode | null;
+  highlightFragment?: string | null;
   onBack?: () => void;
   onHighlightNote?: (text: string) => void;
   onHighlightSearch?: (text: string) => void;
@@ -101,6 +102,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
       selected,
       searchQuery,
       previousSelected,
+      highlightFragment,
       onBack,
       onHighlightNote,
       onHighlightSearch,
@@ -209,12 +211,18 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
 
   useEffect(() => {
     if (!article) return;
-    const hash = window.location.hash.slice(1);
+    const hash = window.location.hash.slice(1) || highlightFragment || "";
     if (!hash) return;
-    setTimeout(() => {
-      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.classList.remove("section-flash");
+      void el.offsetWidth; // force reflow so animation restarts if already active
+      el.classList.add("section-flash");
     }, 80);
-  }, [article]);
+    return () => clearTimeout(timer);
+  }, [article, highlightFragment]);
 
   if (!selected && !searchQuery) {
     return (
