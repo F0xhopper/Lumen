@@ -8,6 +8,7 @@ import {
   X,
   PanelLeftOpen,
   PanelLeftClose,
+  PanelRightOpen,
   Menu,
   BookOpen,
   Bookmark,
@@ -15,11 +16,12 @@ import {
   Sun,
   Moon,
   PenLine,
+  MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
 import ContentViewer, { type ContentViewerHandle } from "@/components/ContentViewer";
-import { type AIChatPanelHandle } from "@/components/AIChatPanel";
+import AIChatPanel, { type AIChatPanelHandle } from "@/components/AIChatPanel";
 import KeybindingsHelp from "@/components/KeybindingsHelp";
 import { SUMMA_PARTS, type SelectedNode, getAdjacentArticles } from "@/lib/summa-full";
 import { SLUG_TO_PART_ID, nodeUrl } from "@/lib/navigation";
@@ -28,6 +30,7 @@ import { useKeybindings } from "@/hooks/useKeybindings";
 import { cn } from "@/lib/utils";
 
 const LEFT_W = 258;
+const RIGHT_W = 300;
 
 function parseParams(params: ReturnType<typeof useParams>): SelectedNode | null {
   function str(v: string | string[] | undefined): string | null {
@@ -83,6 +86,7 @@ export default function SummaShell() {
   const [searchInput, setSearchInput] = useState("");
   const [previousSelected, setPreviousSelected] = useState<SelectedNode | null>(null);
   const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "notes" | "history">("browse");
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -139,6 +143,7 @@ export default function SummaShell() {
       "/": () => { inputRef.current?.focus(); inputRef.current?.select(); },
 
       b: () => setLeftOpen((o) => !o),
+      a: () => setRightOpen((o) => !o),
 
       t: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
 
@@ -269,6 +274,18 @@ export default function SummaShell() {
               : <Moon className="h-3.5 w-3.5" />
             )}
           </button>
+          {!isMobile && (
+            <button
+              onClick={() => setRightOpen((o) => !o)}
+              title={rightOpen ? "Collapse AI chat (a)" : "Open AI chat (a)"}
+              className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors"
+            >
+              {rightOpen
+                ? <MessageSquare className="h-3.5 w-3.5" />
+                : <PanelRightOpen className="h-3.5 w-3.5" />
+              }
+            </button>
+          )}
         </div>
       </header>
 
@@ -358,6 +375,15 @@ export default function SummaShell() {
               <div className="absolute left-0 inset-y-0 w-[2px] bg-border group-hover/edge:bg-foreground/30 transition-colors duration-150" />
             </div>
           )}
+          {!isMobile && rightOpen && (
+            <div
+              onClick={() => setRightOpen((o) => !o)}
+              title="Collapse AI panel"
+              className="absolute right-0 inset-y-0 w-4 z-20 cursor-pointer group/right-edge"
+            >
+              <div className="absolute right-0 inset-y-0 w-[2px] bg-border group-hover/right-edge:bg-foreground/30 transition-colors duration-150" />
+            </div>
+          )}
 
           <main className="flex-1 flex flex-col overflow-hidden min-w-0">
             <ContentViewer
@@ -381,10 +407,27 @@ export default function SummaShell() {
               onHighlightAddToChat={(text) => {
                 if (!selected) return;
                 chatPanelRef.current?.addQuote(text, selected);
+                if (!rightOpen) setRightOpen(true);
               }}
             />
           </main>
         </div>
+
+        {!isMobile && (
+          <aside
+            className="shrink-0 flex flex-col overflow-hidden border-l border-border bg-background transition-[width] duration-200 ease-in-out"
+            style={{ width: rightOpen ? RIGHT_W : 0 }}
+          >
+            {rightOpen && (
+              <AIChatPanel
+                ref={chatPanelRef}
+                selected={selected}
+                onCollapse={() => setRightOpen(false)}
+                onNavigate={(urlPath) => router.push(urlPath)}
+              />
+            )}
+          </aside>
+        )}
 
       </div>
 

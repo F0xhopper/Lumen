@@ -7,6 +7,7 @@ from app.models.schemas import PassageResult
 from app.repositories.article_repo import ArticleRepository
 from app.repositories.pinecone_repo import PineconeMatch, PineconeRepository
 from app.services import embedding, reranker, search
+from app.services.hyde import generate_hypothesis
 
 logger = get_logger(__name__)
 
@@ -115,13 +116,18 @@ async def combined_search(
     min_score: float = 0.3,
     do_rerank: bool = True,
 ) -> list[PassageResult]:
-    dense = await embedding.embed(query, client)
+    # HyDE: generate a hypothetical Aquinas-style passage and run FTS in parallel.
+    # The hypothesis is used only for dense embedding — BM25 sparse and FTS keep
+    # the original query because they're keyword-based and don't benefit from
+    # paraphrased vocabulary.
+    hypothesis, exact_passages = await asyncio.gather(
+        generate_hypothesis(query, client),
+        article_repo.fts_search(query, limit=top_k),
+    )
+    dense = await embedding.embed(hypothesis, client)
     fetch_k = min(top_k * _RERANK_FETCH_MULTIPLIER, _RERANK_FETCH_MAX)
 
-    exact_passages, pinecone_matches = await asyncio.gather(
-        article_repo.fts_search(query, limit=top_k),
-        search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k),
-    )
+    pinecone_matches = await search.pinecone_hybrid_search(query, dense, pinecone_repo, fetch_k)
 
     exact_keys = {(p.part_abbr, p.question_n, p.article_n, p.section) for p in exact_passages}
     unique_pinecone = [

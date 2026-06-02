@@ -70,6 +70,10 @@ async def query_stream(
                 req.conversation_history or [],
             )
 
+            # Emit immediately so the frontend spinner appears before any LLM call
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Thinking…'})}\n\n"
+            await asyncio.sleep(0)
+
             for _ in range(_MAX_AGENT_STEPS + 1):
                 probe = await client.chat.completions.create(
                     model="gpt-4.1",
@@ -88,11 +92,19 @@ async def query_stream(
                             continue
                         agent_steps += 1
 
+                        # Parse the query from the tool call args so we can emit
+                        # "Searching: …" before the expensive HyDE + retrieval runs
+                        try:
+                            preview_query = json.loads(tc.function.arguments).get("query", req.query)
+                        except Exception:
+                            preview_query = req.query
+
+                        yield f"data: {json.dumps({'type': 'status', 'message': f'Searching: {preview_query}'})}\n\n"
+                        await asyncio.sleep(0)
+
                         search_query, passages = await _execute_tool_call(
                             tc, req.query, client, article_repo, pinecone_repo
                         )
-                        yield f"data: {json.dumps({'type': 'status', 'message': f'Searching: {search_query}'})}\n\n"
-                        await asyncio.sleep(0)
 
                         all_passages.extend(passages)
                         messages.append({
@@ -100,7 +112,7 @@ async def query_stream(
                             "tool_call_id": tc.id,
                             "content": _passage_to_tool_result(passages),
                         })
-                        yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(passages)} passages'})}\n\n"
+                        yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(passages)} passages — writing answer…'})}\n\n"
                         await asyncio.sleep(0)
                 else:
                     raw_answer = choice.message.content or ""
