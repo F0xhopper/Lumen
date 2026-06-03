@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getAdjacentArticles, SUMMA_PARTS, type SelectedNode } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
@@ -111,6 +111,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     ref
   ) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -259,6 +260,11 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => prevNode && router.push(nodeUrl(prevNode))}
+                onPointerEnter={() => prevNode?.articleN !== undefined && queryClient.prefetchQuery({
+                  queryKey: ["article", PART_ABBR_TO_PART_ID[prevNode.partAbbr] ?? prevNode.partId, prevNode.questionN, prevNode.articleN],
+                  queryFn: () => fetchArticle(PART_ABBR_TO_PART_ID[prevNode.partAbbr] ?? prevNode.partId, prevNode.questionN, prevNode.articleN!),
+                  staleTime: Infinity,
+                })}
                 disabled={!prevNode}
                 title={prevNode ? `${prevNode.partAbbr} Q.${prevNode.questionN} A.${prevNode.articleN}` : undefined}
                 className="p-2.5 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"
@@ -267,6 +273,11 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
               </button>
               <button
                 onClick={() => nextNode && router.push(nodeUrl(nextNode))}
+                onPointerEnter={() => nextNode?.articleN !== undefined && queryClient.prefetchQuery({
+                  queryKey: ["article", PART_ABBR_TO_PART_ID[nextNode.partAbbr] ?? nextNode.partId, nextNode.questionN, nextNode.articleN],
+                  queryFn: () => fetchArticle(PART_ABBR_TO_PART_ID[nextNode.partAbbr] ?? nextNode.partId, nextNode.questionN, nextNode.articleN!),
+                  staleTime: Infinity,
+                })}
                 disabled={!nextNode}
                 title={nextNode ? `${nextNode.partAbbr} Q.${nextNode.questionN} A.${nextNode.articleN}` : undefined}
                 className="p-2.5 text-muted-foreground/40 hover:text-foreground/70 disabled:opacity-20 disabled:pointer-events-none transition-colors"

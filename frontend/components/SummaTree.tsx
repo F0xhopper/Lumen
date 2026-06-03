@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, memo, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { SUMMA_PARTS, type SelectedNode, type SummaQuestion, type SummaPart } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
+import { fetchArticle } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export interface SummaTreeHandle {
@@ -22,14 +24,16 @@ const TreatiseDivider = memo(({ label }: { label: string }) => (
 ));
 TreatiseDivider.displayName = "TreatiseDivider";
 
-const ArticleRow = memo(({ n, title, isSelected, onClick }: {
+const ArticleRow = memo(({ n, title, isSelected, onClick, onPrefetch }: {
   n: number;
   title?: string;
   isSelected: boolean;
   onClick: () => void;
+  onPrefetch?: () => void;
 }) => (
   <button
     onClick={onClick}
+    onPointerEnter={onPrefetch}
     data-selected={isSelected ? "" : undefined}
     className={cn(
       "w-full text-left px-4 py-1.5 rounded transition-colors flex items-start gap-1.5 border-l-2",
@@ -57,6 +61,7 @@ const QuestionRow = memo(({
   const isQSelected = selected?.partId === part.id && selected.questionN === q.n && selected.articleN === undefined;
   const articleTitles = SUMMA_ARTICLE_TITLES[part.id]?.[q.n];
   const articleCount = articleTitles?.length ?? q.articles;
+  const queryClient = useQueryClient();
 
   return (
     <div>
@@ -85,6 +90,11 @@ const QuestionRow = memo(({
               title={articleTitles?.find((a) => a.n === n)?.title}
               isSelected={selected?.partId === part.id && selected.questionN === q.n && selected.articleN === n}
               onClick={() => onSelect({ partId: part.id, partLabel: part.label, partAbbr: part.abbr, questionN: q.n, questionTitle: q.title, articleN: n })}
+              onPrefetch={() => queryClient.prefetchQuery({
+                queryKey: ["article", part.id, q.n, n],
+                queryFn: () => fetchArticle(part.id, q.n, n),
+                staleTime: Infinity,
+              })}
             />
           ))}
         </div>
@@ -102,6 +112,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isMounted = useRef(false);
 
   useImperativeHandle(ref, () => ({
     focus: () => scrollRef.current?.focus(),
@@ -126,6 +137,7 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
         const n = new Set(prev); n.add(qKey); return n;
       });
     }
+    if (!isMounted.current) { isMounted.current = true; return; }
     setTimeout(() => {
       scrollRef.current?.querySelector("[data-selected]")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 80);
