@@ -311,67 +311,66 @@ export default function SummaShell() {
           )}
           style={{ width: isMobile ? LEFT_W : (leftOpen ? LEFT_W : 0) }}
         >
-          {(leftOpen || isMobile) && (
-            <>
-              <div className="shrink-0 flex items-stretch border-b border-border">
-                {([
-                  { id: "browse",    Icon: BookOpen, label: "Browse"  },
-                  { id: "bookmarks", Icon: Bookmark, label: "Saved"   },
-                  { id: "notes",     Icon: PenLine,  label: "Notes"   },
-                  { id: "history",   Icon: Clock,    label: "History" },
-                ] as const).map(({ id, Icon, label }) => (
-                  <button
-                    key={id}
-                    onClick={() => setSidebarTab(id)}
-                    title={label}
-                    className={cn(
-                      "flex-1 flex items-center justify-center min-h-[44px] py-2 border-b-2 transition-colors",
-                      sidebarTab === id
-                        ? "border-foreground/35 text-foreground/65"
-                        : "border-transparent text-muted-foreground/30 hover:text-muted-foreground/55"
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </button>
-                ))}
-              </div>
+          <div className="flex flex-col h-full w-full overflow-hidden" style={{ width: LEFT_W }}>
+            <div className="shrink-0 flex items-stretch border-b border-border">
+              {([
+                { id: "browse",    Icon: BookOpen, label: "Browse"  },
+                { id: "bookmarks", Icon: Bookmark, label: "Saved"   },
+                { id: "notes",     Icon: PenLine,  label: "Notes"   },
+                { id: "history",   Icon: Clock,    label: "History" },
+              ] as const).map(({ id, Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setSidebarTab(id)}
+                  title={label}
+                  tabIndex={leftOpen || isMobile ? 0 : -1}
+                  className={cn(
+                    "flex-1 flex items-center justify-center min-h-[44px] py-2 border-b-2 transition-colors",
+                    sidebarTab === id
+                      ? "border-foreground/35 text-foreground/65"
+                      : "border-transparent text-muted-foreground/30 hover:text-muted-foreground/55"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+            </div>
 
-              {sidebarTab === "browse" && (
-                <SummaTree ref={summaTreeRef} selected={selected} onSelect={handleTreeSelect} />
-              )}
-              {sidebarTab === "bookmarks" && (
+            {sidebarTab === "browse" && (
+              <SummaTree ref={summaTreeRef} selected={selected} onSelect={handleTreeSelect} />
+            )}
+            {sidebarTab === "bookmarks" && (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No bookmarks yet</p>
+              </div>
+            )}
+            {sidebarTab === "notes" && (() => {
+              if (!selected) return (
                 <div className="flex-1 flex items-center justify-center p-6">
-                  <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No bookmarks yet</p>
+                  <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">Open an article to take notes</p>
                 </div>
-              )}
-              {sidebarTab === "notes" && (() => {
-                if (!selected) return (
-                  <div className="flex-1 flex items-center justify-center p-6">
-                    <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">Open an article to take notes</p>
-                  </div>
-                );
-                const noteKey = `${selected.partId}-${selected.questionN}-${selected.articleN ?? "q"}`;
-                return (
-                  <div className="flex-1 flex flex-col p-3 gap-2">
-                    <p className="font-cardo italic text-[11px] text-muted-foreground/40 leading-tight">
-                      {selected.partAbbr} Q.{selected.questionN}{selected.articleN ? ` A.${selected.articleN}` : ""}
-                    </p>
-                    <textarea
-                      className="flex-1 w-full bg-transparent resize-none text-[12px] font-cardo text-foreground/80 placeholder:text-muted-foreground/25 focus:outline-none leading-relaxed"
-                      placeholder="Write a note…"
-                      value={notes[noteKey] ?? ""}
-                      onChange={(e) => updateNote(noteKey, e.target.value)}
-                    />
-                  </div>
-                );
-              })()}
-              {sidebarTab === "history" && (
-                <div className="flex-1 flex items-center justify-center p-6">
-                  <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No history yet</p>
+              );
+              const noteKey = `${selected.partId}-${selected.questionN}-${selected.articleN ?? "q"}`;
+              return (
+                <div className="flex-1 flex flex-col p-3 gap-2">
+                  <p className="font-cardo italic text-[11px] text-muted-foreground/40 leading-tight">
+                    {selected.partAbbr} Q.{selected.questionN}{selected.articleN ? ` A.${selected.articleN}` : ""}
+                  </p>
+                  <textarea
+                    className="flex-1 w-full bg-transparent resize-none text-[12px] font-cardo text-foreground/80 placeholder:text-muted-foreground/25 focus:outline-none leading-relaxed"
+                    placeholder="Write a note…"
+                    value={notes[noteKey] ?? ""}
+                    onChange={(e) => updateNote(noteKey, e.target.value)}
+                  />
                 </div>
-              )}
-            </>
-          )}
+              );
+            })()}
+            {sidebarTab === "history" && (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No history yet</p>
+              </div>
+            )}
+          </div>
         </aside>
 
         <div className="flex flex-col flex-1 overflow-hidden min-w-0 relative">
