@@ -281,6 +281,7 @@ export default function SummaShell() {
               : <Moon className="h-3.5 w-3.5" />
             )}
           </button>
+          {/* AI chat toggle — hidden while AI panel is disabled
           {!isMobile && (
             <button
               onClick={() => setRightOpen((o) => !o)}
@@ -293,6 +294,7 @@ export default function SummaShell() {
               }
             </button>
           )}
+          */}
         </div>
       </header>
 
@@ -382,6 +384,7 @@ export default function SummaShell() {
               <div className="absolute left-0 inset-y-0 w-[2px] bg-border group-hover/edge:bg-foreground/30 transition-colors duration-150" />
             </div>
           )}
+          {/* AI panel edge handle — hidden while AI panel is disabled
           {!isMobile && rightOpen && (
             <div
               onClick={() => setRightOpen((o) => !o)}
@@ -391,6 +394,7 @@ export default function SummaShell() {
               <div className="absolute right-0 inset-y-0 w-[2px] bg-border group-hover/right-edge:bg-foreground/30 transition-colors duration-150" />
             </div>
           )}
+          */}
 
           <main className="flex-1 flex flex-col overflow-hidden min-w-0">
             <ContentViewer
@@ -421,6 +425,7 @@ export default function SummaShell() {
           </main>
         </div>
 
+        {/* AI chat panel — hidden while AI panel is disabled
         {!isMobile && (
           <aside
             className="shrink-0 flex flex-col overflow-hidden border-l border-border bg-background transition-[width] duration-200 ease-in-out"
@@ -436,6 +441,7 @@ export default function SummaShell() {
             )}
           </aside>
         )}
+        */}
 
       </div>
 
