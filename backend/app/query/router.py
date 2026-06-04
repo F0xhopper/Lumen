@@ -5,11 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 
-from app.core.dependencies import get_article_repo, get_openai, get_pinecone_repo
+from app.articles.repository import ArticleRepository
 from app.core.logging import get_logger
-from app.models.schemas import PassageResult, QueryRequest, QueryResponse
-from app.repositories.article_repo import ArticleRepository
-from app.repositories.pinecone_repo import PineconeRepository
+from app.infrastructure.database import get_pool
+from app.infrastructure.openai import get_openai_client
+from app.infrastructure.pinecone import get_pinecone_index
+from app.passages.repository import PineconeRepository
+from app.passages.schemas import PassageResult
+from app.query.schemas import QueryRequest, QueryResponse
+from app.query.service import QueryService
 from app.services.agent import (
     _MAX_AGENT_STEPS,
     _PASSAGES_PER_SEARCH,
@@ -24,43 +28,44 @@ from app.services.agent import (
 from app.services.retrieval import combined_search
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/query", tags=["query"])
 
 
-@router.post("/query", response_model=QueryResponse)
-async def query(
-    req: QueryRequest,
-    client: AsyncOpenAI = Depends(get_openai),
-    pinecone_repo: PineconeRepository = Depends(get_pinecone_repo),
-    article_repo: ArticleRepository = Depends(get_article_repo),
-):
+def _get_service(
+    pool=Depends(get_pool),
+    openai_client: AsyncOpenAI = Depends(get_openai_client),
+    pinecone_index=Depends(get_pinecone_index),
+) -> QueryService:
+    return QueryService(
+        article_repo=ArticleRepository(pool),
+        pinecone_repo=PineconeRepository(pinecone_index),
+        openai_client=openai_client,
+    )
+
+
+@router.post("/", response_model=QueryResponse)
+async def query(req: QueryRequest, svc: QueryService = Depends(_get_service)):
     try:
-        result = await run_agent(
+        return await svc.run(
             query=req.query,
-            client=client,
-            pinecone_repo=pinecone_repo,
-            article_repo=article_repo,
             pinned_sections=req.pinned_sections,
             conversation_history=req.conversation_history,
         )
-        return QueryResponse(
-            answer=result.answer,
-            citations=result.citations,
-            passages_used=result.passages_used,
-            agent_steps=result.agent_steps,
-        )
-    except Exception as e:
-        logger.error("Error in POST /query: %s", e, exc_info=True)
+    except Exception as exc:
+        logger.error("Query failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/query/stream")
+@router.post("/stream")
 async def query_stream(
     req: QueryRequest,
-    client: AsyncOpenAI = Depends(get_openai),
-    pinecone_repo: PineconeRepository = Depends(get_pinecone_repo),
-    article_repo: ArticleRepository = Depends(get_article_repo),
+    pool=Depends(get_pool),
+    openai_client: AsyncOpenAI = Depends(get_openai_client),
+    pinecone_index=Depends(get_pinecone_index),
 ):
+    article_repo = ArticleRepository(pool)
+    pinecone_repo = PineconeRepository(pinecone_index)
+
     async def event_stream():
         try:
             all_passages: list[PassageResult] = []
@@ -77,7 +82,7 @@ async def query_stream(
             await asyncio.sleep(0)
 
             for _ in range(_MAX_AGENT_STEPS + 1):
-                stream = await client.chat.completions.create(
+                stream = await openai_client.chat.completions.create(
                     model="gpt-4.1",
                     messages=messages,
                     tools=[_SEARCH_TOOL],  # type: ignore[list-item]
@@ -87,7 +92,6 @@ async def query_stream(
                     stream=True,
                 )
 
-                # Accumulate tool call deltas; stream text tokens line-by-line.
                 tc_acc: dict[int, dict] = {}
                 full_text = ""
                 is_text: bool | None = None
@@ -96,7 +100,6 @@ async def query_stream(
 
                 async for chunk in stream:
                     delta = chunk.choices[0].delta
-
                     if delta.tool_calls:
                         is_text = False
                         for tcd in delta.tool_calls:
@@ -110,14 +113,11 @@ async def query_stream(
                                     tc_acc[idx]["name"] += tcd.function.name
                                 if tcd.function.arguments:
                                     tc_acc[idx]["arguments"] += tcd.function.arguments
-
                     elif delta.content is not None:
                         is_text = True
                         full_text += delta.content
-
                         if not stop_streaming:
                             line_buf += delta.content
-                            # Emit complete lines; stop at the citations fence.
                             while "\n" in line_buf:
                                 nl = line_buf.index("\n")
                                 line = line_buf[: nl + 1]
@@ -131,14 +131,8 @@ async def query_stream(
 
                 if is_text is False and tc_acc:
                     tool_calls = [
-                        {
-                            "id": tc_acc[i]["id"],
-                            "type": "function",
-                            "function": {
-                                "name": tc_acc[i]["name"],
-                                "arguments": tc_acc[i]["arguments"],
-                            },
-                        }
+                        {"id": tc_acc[i]["id"], "type": "function",
+                         "function": {"name": tc_acc[i]["name"], "arguments": tc_acc[i]["arguments"]}}
                         for i in sorted(tc_acc)
                     ]
                     messages.append({"role": "assistant", "content": None, "tool_calls": tool_calls})
@@ -147,15 +141,12 @@ async def query_stream(
                         if tc["function"]["name"] != "search_summa":
                             continue
                         agent_steps += 1
-
                         try:
                             preview_query = json.loads(tc["function"]["arguments"]).get("query", req.query)
                         except Exception:
                             preview_query = req.query
-
                         yield f"data: {json.dumps({'type': 'status', 'message': f'Searching: {preview_query}'})}\n\n"
                         await asyncio.sleep(0)
-
                         try:
                             args = json.loads(tc["function"]["arguments"])
                             search_query = args.get("query", req.query)
@@ -163,16 +154,13 @@ async def query_stream(
                         except (json.JSONDecodeError, ValueError):
                             search_query = req.query
                             top_k = _PASSAGES_PER_SEARCH
-
-                        logger.info("Agent stream search: %r top_k=%d", search_query, top_k)
                         passages = await combined_search(
                             search_query,
-                            client=client,
+                            client=openai_client,
                             article_repo=article_repo,
                             pinecone_repo=pinecone_repo,
                             top_k=top_k,
                         )
-
                         all_passages.extend(passages)
                         messages.append({
                             "role": "tool",
@@ -183,19 +171,17 @@ async def query_stream(
                         await asyncio.sleep(0)
 
                 elif is_text is True:
-                    # Flush any trailing partial line that has no trailing newline.
                     if not stop_streaming and line_buf and not line_buf.strip().startswith(CITATIONS_MARKER):
                         yield f"data: {json.dumps({'type': 'token', 'text': _normalize_inline_refs(line_buf)})}\n\n"
                         await asyncio.sleep(0)
-
                     _, citations = _parse_citations_block(full_text, all_passages)
                     yield f"data: {json.dumps({'type': 'done', 'citations': [c.model_dump() for c in citations], 'passages_used': len(_deduplicate_passages(all_passages)), 'agent_steps': agent_steps})}\n\n"
                     return
 
             yield f"data: {json.dumps({'type': 'error', 'message': 'Agent search limit reached'})}\n\n"
 
-        except Exception as e:
-            logger.error("Error in POST /query/stream: %s", e, exc_info=True)
+        except Exception as exc:
+            logger.error("Stream error: %s", exc, exc_info=True)
             yield f"data: {json.dumps({'type': 'error', 'message': 'Internal server error'})}\n\n"
 
     return StreamingResponse(

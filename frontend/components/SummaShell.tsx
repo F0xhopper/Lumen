@@ -13,20 +13,26 @@ import {
   BookOpen,
   Bookmark,
   Clock,
-  Sun,
-  Moon,
   PenLine,
   MessageSquare,
+  UserCircle,
+  BookmarkCheck,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
 import ContentViewer, { type ContentViewerHandle } from "@/components/ContentViewer";
 import AIChatPanel, { type AIChatPanelHandle } from "@/components/AIChatPanel";
 import KeybindingsHelp from "@/components/KeybindingsHelp";
+import AuthModal from "@/components/AuthModal";
+import UserMenu from "@/components/UserMenu";
+import BookmarksPanel from "@/components/BookmarksPanel";
+import { useAuth } from "@/components/AuthProvider";
 import { SUMMA_PARTS, type SelectedNode, getAdjacentArticles } from "@/lib/summa-full";
 import { SLUG_TO_PART_ID, nodeUrl } from "@/lib/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useKeybindings } from "@/hooks/useKeybindings";
+import { useBookmarks } from "@/hooks/useBookmarks";
+import { useHistory } from "@/hooks/useHistory";
 import { cn } from "@/lib/utils";
 
 const LEFT_W = 258;
@@ -76,6 +82,7 @@ export default function SummaShell() {
   const isMobile = useIsMobile();
   const selected = parseParams(params);
   const { resolvedTheme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
 
   const chatPanelRef = useRef<AIChatPanelHandle>(null);
   const contentViewerRef = useRef<ContentViewerHandle>(null);
@@ -88,11 +95,15 @@ export default function SummaShell() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"browse" | "bookmarks" | "notes" | "history">("browse");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [highlightFragment, setHighlightFragment] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+
+  const { bookmarks, add: addBookmark, remove: removeBookmark, moveToFolder, isBookmarked, bookmarkId } = useBookmarks(user);
+  const { history, record: recordVisit } = useHistory(user);
 
   useEffect(() => setMounted(true), []);
 
@@ -163,6 +174,10 @@ export default function SummaShell() {
   const handleNavigate = (urlPath: string) => {
     const hashIdx = urlPath.indexOf("#");
     setHighlightFragment(hashIdx !== -1 ? urlPath.slice(hashIdx + 1) : null);
+    // Record history for article navigations from the AI panel or citations
+    const clean = hashIdx !== -1 ? urlPath.slice(0, hashIdx) : urlPath;
+    const parsed = parseParams({ part: clean.split("/")[1], question: clean.split("/")[2], article: clean.split("/")[3] });
+    if (parsed) recordVisit(parsed);
     router.push(urlPath);
   };
 
@@ -171,6 +186,7 @@ export default function SummaShell() {
     setSearchInput("");
     setPreviousSelected(null);
     if (isMobile) setLeftOpen(false);
+    recordVisit(node);
     router.push(nodeUrl(node));
   };
 
@@ -271,16 +287,35 @@ export default function SummaShell() {
         </form>
 
         <div className="shrink-0 flex items-center gap-0.5 ml-auto pr-2">
-          <button
-            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-            title="Toggle theme (t)"
-            className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
-          >
-            {mounted && (resolvedTheme === "dark"
-              ? <Sun className="h-3.5 w-3.5" />
-              : <Moon className="h-3.5 w-3.5" />
-            )}
-          </button>
+          {selected && user && (
+            <button
+              onClick={() => isBookmarked(selected) ? removeBookmark(bookmarkId(selected)!) : addBookmark(selected)}
+              title={isBookmarked(selected) ? "Remove bookmark" : "Bookmark this article"}
+              className="p-2.5 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+            >
+              {isBookmarked(selected)
+                ? <BookmarkCheck className="h-3.5 w-3.5 text-foreground/60" />
+                : <Bookmark className="h-3.5 w-3.5" />
+              }
+            </button>
+          )}
+          {mounted && (
+            user ? (
+              <UserMenu
+                user={user}
+                onSignOut={signOut}
+                onShowKeybindings={() => setHelpOpen(true)}
+              />
+            ) : (
+              <button
+                onClick={() => setAuthOpen(true)}
+                title="Sign in"
+                className="p-2.5 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+              >
+                <UserCircle className="h-3.5 w-3.5" />
+              </button>
+            )
+          )}
           {/* AI chat toggle — hidden while AI panel is disabled
           {!isMobile && (
             <button
@@ -340,9 +375,14 @@ export default function SummaShell() {
               <SummaTree ref={summaTreeRef} selected={selected} onSelect={handleTreeSelect} />
             )}
             {sidebarTab === "bookmarks" && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No bookmarks yet</p>
-              </div>
+              <BookmarksPanel
+                bookmarks={bookmarks}
+                isSignedIn={!!user}
+                onNavigate={(url) => { router.push(url); if (isMobile) setLeftOpen(false); }}
+                onRemove={removeBookmark}
+                onMoveToFolder={moveToFolder}
+                onSignIn={() => setAuthOpen(true)}
+              />
             )}
             {sidebarTab === "notes" && (() => {
               if (!selected) return (
@@ -366,8 +406,41 @@ export default function SummaShell() {
               );
             })()}
             {sidebarTab === "history" && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No history yet</p>
+              <div className="flex-1 overflow-y-auto">
+                {!user ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 p-6">
+                    <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">Sign in to track reading history</p>
+                    <button
+                      onClick={() => setAuthOpen(true)}
+                      className="font-inter text-[10px] tracking-wide px-3 py-1.5 border border-border rounded text-muted-foreground/50 hover:text-foreground/70 hover:border-foreground/25 transition-colors"
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                ) : history.length === 0 ? (
+                  <div className="flex items-center justify-center h-full p-6">
+                    <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center">No history yet</p>
+                  </div>
+                ) : (
+                  <ul className="py-1">
+                    {history.map((h) => {
+                      const slug = { "prima-pars": "1", "prima-secundae": "1-2", "secunda-secundae": "2-2", "tertia-pars": "3" }[h.part_id] ?? h.part_id;
+                      return (
+                        <li key={h.id}>
+                          <button
+                            onClick={() => {
+                              router.push(h.article_n ? `/${slug}/${h.question_n}/${h.article_n}` : `/${slug}/${h.question_n}`);
+                              if (isMobile) setLeftOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 font-cardo text-[12px] text-foreground/65 hover:text-foreground/90 leading-tight truncate transition-colors"
+                          >
+                            Q.{h.question_n}{h.article_n ? ` A.${h.article_n}` : ""}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             )}
           </div>
@@ -445,6 +518,7 @@ export default function SummaShell() {
       </div>
 
       <KeybindingsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </div>
   );
 }

@@ -3,7 +3,7 @@ from pathlib import Path
 from pinecone_text.sparse import BM25Encoder
 
 from app.core.logging import get_logger
-from app.repositories.pinecone_repo import PineconeMatch, PineconeRepository
+from app.passages.repository import PineconeMatch, PineconeRepository
 
 logger = get_logger(__name__)
 

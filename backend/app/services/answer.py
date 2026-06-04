@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
 
-from app.models.schemas import PassageResult
+from app.passages.schemas import PassageResult
 
 
 def _format_context(passages: list[PassageResult]) -> str:

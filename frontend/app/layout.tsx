@@ -3,6 +3,7 @@ import { Inter, Cardo } from "next/font/google";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import QueryProvider from "@/components/QueryProvider";
+import { AuthProvider } from "@/components/AuthProvider";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -38,7 +39,9 @@ export default function RootLayout({
     >
       <body className={`${inter.className} antialiased`}>
         <QueryProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <AuthProvider>
+            <ThemeProvider>{children}</ThemeProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

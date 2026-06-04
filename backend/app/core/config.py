@@ -26,6 +26,8 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     DATABASE_SSL: bool = os.getenv("DATABASE_SSL", "false").lower() == "true"
 
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
+
     def check_required_vars(self) -> list[str]:
         missing = []
         if not self.OPENAI_API_KEY:
@@ -34,6 +36,8 @@ class Settings:
             missing.append("PINECONE_API_KEY")
         if not self.DATABASE_URL:
             missing.append("DATABASE_URL")
+        if not self.SUPABASE_JWT_SECRET:
+            missing.append("SUPABASE_JWT_SECRET")
         return missing
 
 

@@ -7,8 +7,9 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.schemas import CitationResult, ConversationTurn, PassageResult, PinnedSection
-from app.repositories.pinecone_repo import PineconeRepository
+from app.passages.repository import PineconeRepository
+from app.passages.schemas import PassageResult
+from app.query.schemas import CitationResult, ConversationTurn, PinnedSection
 from app.services.retrieval import combined_search
 
 logger = get_logger(__name__)

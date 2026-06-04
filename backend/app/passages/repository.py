@@ -1,18 +1,18 @@
 import asyncio
-
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
 
 from app.core.config import settings
 
 
-class PineconeMatch(BaseModel):
+@dataclass
+class PineconeMatch:
     text: str
     score: float
-    metadata: dict = Field(default_factory=dict)
+    metadata: dict
 
 
 class PineconeRepository:
-    def __init__(self, index):
+    def __init__(self, index) -> None:
         self._index = index
 
     async def hybrid_query(

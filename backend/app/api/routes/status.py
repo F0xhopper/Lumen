@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from app.core.dependencies import get_db_pool, get_pinecone_index
+from app.infrastructure.database import get_pool as get_db_pool
+from app.infrastructure.pinecone import get_pinecone_index
 
 router = APIRouter()
 

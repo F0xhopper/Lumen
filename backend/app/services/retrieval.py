@@ -3,9 +3,9 @@ import asyncio
 from openai import AsyncOpenAI
 
 from app.core.logging import get_logger
-from app.models.schemas import PassageResult
-from app.repositories.article_repo import ArticleRepository
-from app.repositories.pinecone_repo import PineconeMatch, PineconeRepository
+from app.articles.repository import ArticleRepository
+from app.passages.repository import PineconeMatch, PineconeRepository
+from app.passages.schemas import PassageResult
 from app.services import embedding, reranker, search
 from app.services.hyde import generate_hypothesis
 
