@@ -60,6 +60,7 @@ cp .env.example .env
 ```
 
 Required environment variables:
+
 - `OPENAI_API_KEY` - OpenAI API key for LLM and embeddings
 - `PINECONE_API_KEY` - Pinecone API key for vector storage
 - `PINECONE_INDEX_NAME` - Name of your Pinecone index
@@ -68,11 +69,13 @@ Required environment variables:
 ### 2. Install Dependencies
 
 For development:
+
 ```bash
 pip install -r requirements/dev.txt
 ```
 
 For production:
+
 ```bash
 pip install -r requirements/prod.txt
 ```
@@ -80,17 +83,20 @@ pip install -r requirements/prod.txt
 ### 3. Run the Application
 
 #### Development Mode
+
 ```bash
 # From the backend directory
 python -m app.main
 ```
 
 #### Or use uvicorn directly
+
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 #### Docker
+
 ```bash
 cd docker
 docker-compose up --build
@@ -113,14 +119,17 @@ docker-compose up --build
 ## Architecture
 
 ### Service Layer
+
 - **RAGService**: Main orchestrator for all RAG operations
 - **EmbeddingService**: Manages LLM and embedding models
 - **QueryService**: Handles query processing and retrieval
 
 ### Repository Layer
+
 - **VectorRepository**: Manages Pinecone vector store operations
 
 ### API Layer
+
 - Focused route modules for different functionalities
 - Middleware for CORS and error handling
 - Dependency injection for service management
@@ -132,17 +141,20 @@ Configuration is managed through environment variables and the `Settings` class 
 ## Development
 
 ### Running Tests
+
 ```bash
 pytest
 ```
 
 ### Code Formatting
+
 ```bash
 black app/
 isort app/
 ```
 
 ### Type Checking
+
 ```bash
 mypy app/
 ```
@@ -150,8 +162,8 @@ mypy app/
 ## Migration from Old Structure
 
 The new structure provides:
+
 - **Better separation of concerns** - API, business logic, and data access are clearly separated
 - **Improved testability** - Each layer can be tested independently
 - **Enhanced maintainability** - Smaller, focused files are easier to understand and modify
 - **Scalability** - Easy to add new features without affecting existing code
-- **Professional organization** - Follows industry best practices for Python web applications
