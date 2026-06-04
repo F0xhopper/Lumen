@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-from app.passages.schemas import PassageResult
-
 
 class CitationResult(BaseModel):
     ref: str

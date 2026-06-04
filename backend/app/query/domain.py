@@ -1,7 +1,5 @@
 from dataclasses import dataclass, field
 
-from app.passages.domain import Passage
-
 
 @dataclass
 class QueryResult:

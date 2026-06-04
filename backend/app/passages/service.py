@@ -1,7 +1,6 @@
 from openai import AsyncOpenAI
 
 from app.articles.repository import ArticleRepository
-from app.passages.domain import QuestionMatch
 from app.passages.repository import PineconeRepository
 from app.passages.schemas import PassageResult, QuestionResult
 from app.services import embedding

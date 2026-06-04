@@ -23,7 +23,6 @@ from app.services.agent import (
     _normalize_inline_refs,
     _parse_citations_block,
     _passage_to_tool_result,
-    run_agent,
 )
 from app.services.retrieval import combined_search
 
