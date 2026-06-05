@@ -4,7 +4,7 @@ import {
   useState, useRef, useEffect, useCallback,
   forwardRef, useImperativeHandle,
 } from "react";
-import { Send, Loader2, RotateCcw, PanelRightClose } from "lucide-react";
+import { Send, RotateCcw, PanelRightClose } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import {
   ContextArgChip,
@@ -309,11 +309,21 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         ))}
 
         {isPending && (
-          <div className="flex items-center gap-2 pl-3 text-muted-foreground/35">
-            <Loader2 className="h-3 w-3 animate-spin shrink-0" />
-            <span className="font-inter text-[9px] tracking-wide truncate">
-              {streamStatus ?? "Thinking…"}
+          <div className="flex items-center gap-2 pl-1">
+            <span className="flex gap-[3px] items-center shrink-0 py-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="inline-block w-[3px] h-[3px] rounded-full bg-muted-foreground/30 animate-bounce"
+                  style={{ animationDelay: `${i * 120}ms`, animationDuration: "900ms" }}
+                />
+              ))}
             </span>
+            {streamStatus && (
+              <span className="font-inter text-[9px] tracking-wide text-muted-foreground/30 truncate transition-opacity duration-300">
+                {streamStatus}
+              </span>
+            )}
           </div>
         )}
 

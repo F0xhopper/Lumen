@@ -11,7 +11,7 @@ import { fetchArticle, fetchPassages, fetchQuestionMatches } from "@/lib/api";
 import { PART_ABBR_TO_PART_ID, PART_ID_TO_SLUG, nodeUrl } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { ArticleView } from "./ArticleView";
-import { PassageList, QuestionJumpList, SearchLoadingSkeleton } from "./PassageList";
+import { PassageList, QuestionJumpList, SearchLoadingSkeleton, ArticleLoadingSkeleton, EmptySearchState } from "./PassageList";
 import { HighlightMenu, type HighlightState } from "./HighlightMenu";
 
 function ContentHeader({
@@ -211,6 +211,10 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
   }, [selected?.partId, selected?.questionN, selected?.articleN]);
 
   useEffect(() => {
+    if (scrollRef.current && trimmedQuery) scrollRef.current.scrollTop = 0;
+  }, [trimmedQuery]);
+
+  useEffect(() => {
     if (!article) return;
     const hash = window.location.hash.slice(1) || highlightFragment || "";
     if (!hash) return;
@@ -293,11 +297,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
         <div className={cn("mx-auto", isSearchMode || isQuestionMode ? "max-w-prose" : "w-full")}>
           {isLoading && isSearchMode && <SearchLoadingSkeleton />}
 
-          {isLoading && isArticleMode && (
-            <div className="py-2">
-              <span className="text-[9px] text-muted-foreground/20 animate-pulse select-none">✦</span>
-            </div>
-          )}
+          {isLoading && isArticleMode && <ArticleLoadingSkeleton />}
 
           {error && (
             <p className="font-inter text-[11px] text-muted-foreground border border-border rounded p-4">
@@ -352,9 +352,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
           )}
 
           {!isLoading && !error && isSearchMode && passages.length === 0 && questionMatches.length === 0 && (
-            <p className="font-cardo italic text-[13px] text-muted-foreground/40">
-              No passages retrieved. The index may not contain this text yet.
-            </p>
+            <EmptySearchState query={trimmedQuery} />
           )}
 
           {!isLoading && isSearchMode && passages.length > 0 && (
