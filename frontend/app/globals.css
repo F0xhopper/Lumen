@@ -4,6 +4,13 @@
 
 @layer base {
   :root {
+    /* Reading typography — updated dynamically by FontPrefsProvider */
+    --reading-font: var(--font-cardo), Georgia, serif;
+    --reading-size: 14.5px;
+    --reading-leading: 1.95;
+    --reading-tracking: 0em;
+    --reading-weight: 400;
+
     --background: 0 0% 97%;
     --foreground: 0 0% 7%;
     --card: 0 0% 94%;
@@ -210,4 +217,14 @@ textarea:focus-visible {
 .section-flash {
   animation: section-flash 1.6s ease-out;
   border-radius: 4px;
+}
+
+/* Applied to article body paragraphs — values driven by CSS custom properties
+   set in :root and overridden at runtime by FontPrefsProvider. */
+.reading-text {
+  font-family: var(--reading-font);
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
+  letter-spacing: var(--reading-tracking);
+  font-weight: var(--reading-weight);
 }

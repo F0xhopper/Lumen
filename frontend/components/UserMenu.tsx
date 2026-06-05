@@ -6,6 +6,15 @@ import type { User } from "@supabase/supabase-js";
 import { Check, Keyboard, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import {
+  useFontPrefs,
+  FONT_FAMILY_CSS,
+  type FontFamily,
+  type FontSize,
+  type LineHeight,
+  type LetterSpacing,
+  type FontWeight,
+} from "@/components/FontPrefsProvider";
 
 interface Props {
   user: User;
@@ -25,10 +34,44 @@ const THEMES = [
   { value: "system", label: "System", Icon: Monitor },
 ] as const;
 
+const FONT_FAMILIES: { value: FontFamily; label: string }[] = [
+  { value: "cardo",       label: "Cardo"    },
+  { value: "lora",        label: "Lora"     },
+  { value: "garamond",    label: "Garamond" },
+  { value: "baskerville", label: "Bskvl"    },
+  { value: "georgia",     label: "Georgia"  },
+  { value: "inter",       label: "Inter"    },
+];
+
+const FONT_SIZES: { value: FontSize; label: string }[] = [
+  { value: "sm", label: "S"  },
+  { value: "md", label: "M"  },
+  { value: "lg", label: "L"  },
+  { value: "xl", label: "XL" },
+];
+
+const LINE_HEIGHTS: { value: LineHeight; label: string; icon: string }[] = [
+  { value: "compact", label: "Compact", icon: "≡" },
+  { value: "normal",  label: "Normal",  icon: "☰" },
+  { value: "relaxed", label: "Relaxed", icon: "⋮" },
+];
+
+const LETTER_SPACINGS: { value: LetterSpacing; label: string }[] = [
+  { value: "tight",  label: "Tight"  },
+  { value: "normal", label: "Normal" },
+  { value: "loose",  label: "Loose"  },
+];
+
+const FONT_WEIGHTS: { value: FontWeight; label: string }[] = [
+  { value: "regular", label: "Regular" },
+  { value: "medium",  label: "Medium"  },
+];
+
 export default function UserMenu({ user, onSignOut, onShowKeybindings }: Props) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
+  const { prefs, setPrefs } = useFontPrefs();
 
   const email = user.email ?? "";
   const avatarUrl: string | undefined = user.user_metadata?.avatar_url;
@@ -81,7 +124,7 @@ export default function UserMenu({ user, onSignOut, onShowKeybindings }: Props) 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-[200px] z-50 rounded-lg border border-border bg-background shadow-xl"
+          className="absolute right-0 top-full mt-2 w-[248px] z-50 rounded-lg border border-border bg-background shadow-xl"
         >
           {/* User */}
           <div className="px-3 pt-3 pb-2.5">
@@ -97,7 +140,7 @@ export default function UserMenu({ user, onSignOut, onShowKeybindings }: Props) 
 
           <div className="h-px bg-border mx-0" />
 
-          {/* Appearance preference */}
+          {/* Appearance */}
           <div className="py-1.5">
             <p className="px-3 pt-1 pb-1 font-inter text-[9px] tracking-[0.1em] uppercase text-muted-foreground/35">
               Appearance
@@ -122,6 +165,158 @@ export default function UserMenu({ user, onSignOut, onShowKeybindings }: Props) 
                 </button>
               );
             })}
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Typography */}
+          <div className="py-2">
+            <p className="px-3 pt-0.5 pb-2 font-inter text-[9px] tracking-[0.1em] uppercase text-muted-foreground/35">
+              Typography
+            </p>
+
+            {/* Font family */}
+            <div className="px-3 mb-2.5">
+              <p className="font-inter text-[9px] text-muted-foreground/40 mb-1.5 uppercase tracking-[0.08em]">Font</p>
+              <div className="grid grid-cols-6 gap-0.5">
+                {FONT_FAMILIES.map(({ value, label }) => {
+                  const active = prefs.fontFamily === value;
+                  return (
+                    <button
+                      key={value}
+                      title={label}
+                      aria-label={`Font: ${label}`}
+                      aria-pressed={active}
+                      onClick={() => setPrefs({ ...prefs, fontFamily: value })}
+                      className={cn(
+                        "flex flex-col items-center gap-0.5 py-1.5 rounded transition-colors",
+                        "hover:bg-foreground/[0.05]",
+                        active ? "bg-foreground/[0.07] ring-1 ring-foreground/10" : "",
+                      )}
+                    >
+                      <span
+                        className="text-[13px] text-foreground/75 leading-none"
+                        style={{ fontFamily: FONT_FAMILY_CSS[value] }}
+                      >
+                        Aa
+                      </span>
+                      <span className={cn(
+                        "font-inter text-[7.5px] leading-none truncate w-full text-center",
+                        active ? "text-foreground/70" : "text-muted-foreground/40",
+                      )}>
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Font size */}
+            <div className="px-3 mb-2.5">
+              <p className="font-inter text-[9px] text-muted-foreground/40 mb-1.5 uppercase tracking-[0.08em]">Size</p>
+              <div className="grid grid-cols-4 gap-0.5">
+                {FONT_SIZES.map(({ value, label }) => {
+                  const active = prefs.fontSize === value;
+                  return (
+                    <button
+                      key={value}
+                      aria-pressed={active}
+                      onClick={() => setPrefs({ ...prefs, fontSize: value })}
+                      className={cn(
+                        "py-1 rounded font-inter text-[10px] transition-colors",
+                        "hover:bg-foreground/[0.05]",
+                        active
+                          ? "bg-foreground/[0.07] text-foreground/90 ring-1 ring-foreground/10"
+                          : "text-foreground/50",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Line height */}
+            <div className="px-3 mb-2.5">
+              <p className="font-inter text-[9px] text-muted-foreground/40 mb-1.5 uppercase tracking-[0.08em]">Spacing</p>
+              <div className="grid grid-cols-3 gap-0.5">
+                {LINE_HEIGHTS.map(({ value, label, icon }) => {
+                  const active = prefs.lineHeight === value;
+                  return (
+                    <button
+                      key={value}
+                      aria-pressed={active}
+                      onClick={() => setPrefs({ ...prefs, lineHeight: value })}
+                      className={cn(
+                        "flex flex-col items-center gap-0.5 py-1.5 rounded transition-colors",
+                        "hover:bg-foreground/[0.05]",
+                        active
+                          ? "bg-foreground/[0.07] text-foreground/90 ring-1 ring-foreground/10"
+                          : "text-foreground/50",
+                      )}
+                    >
+                      <span className="font-inter text-[12px] leading-none">{icon}</span>
+                      <span className="font-inter text-[8px] leading-none">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Letter spacing */}
+            <div className="px-3 mb-2.5">
+              <p className="font-inter text-[9px] text-muted-foreground/40 mb-1.5 uppercase tracking-[0.08em]">Tracking</p>
+              <div className="grid grid-cols-3 gap-0.5">
+                {LETTER_SPACINGS.map(({ value, label }) => {
+                  const active = prefs.letterSpacing === value;
+                  return (
+                    <button
+                      key={value}
+                      aria-pressed={active}
+                      onClick={() => setPrefs({ ...prefs, letterSpacing: value })}
+                      className={cn(
+                        "py-1 rounded font-inter text-[10px] transition-colors text-center",
+                        "hover:bg-foreground/[0.05]",
+                        active
+                          ? "bg-foreground/[0.07] text-foreground/90 ring-1 ring-foreground/10"
+                          : "text-foreground/50",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Font weight */}
+            <div className="px-3">
+              <p className="font-inter text-[9px] text-muted-foreground/40 mb-1.5 uppercase tracking-[0.08em]">Weight</p>
+              <div className="grid grid-cols-2 gap-0.5">
+                {FONT_WEIGHTS.map(({ value, label }) => {
+                  const active = prefs.fontWeight === value;
+                  return (
+                    <button
+                      key={value}
+                      aria-pressed={active}
+                      onClick={() => setPrefs({ ...prefs, fontWeight: value })}
+                      className={cn(
+                        "py-1 rounded font-inter text-[10px] transition-colors text-center",
+                        "hover:bg-foreground/[0.05]",
+                        active
+                          ? "bg-foreground/[0.07] text-foreground/90 ring-1 ring-foreground/10"
+                          : "text-foreground/50",
+                        value === "medium" ? "font-medium" : "",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <div className="h-px bg-border" />

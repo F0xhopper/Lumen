@@ -102,7 +102,7 @@ function SectionBlock({ id, text, className, dropcap, partAbbr, questionN }: {
 }) {
   return (
     <section id={id} className={cn("scroll-mt-6", dropcap && "article-dropcap", className)}>
-      <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/82 whitespace-pre-wrap">
+      <p className="reading-text text-foreground/82 whitespace-pre-wrap">
         {renderSection(text, partAbbr, questionN)}
       </p>
     </section>
