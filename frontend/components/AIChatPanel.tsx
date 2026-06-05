@@ -12,7 +12,7 @@ import {
   buildContextPrefix,
   type ContextArg,
 } from "./ContextArgChip";
-import { streamQuery } from "@/lib/api";
+import { streamQuery, getErrorMessage } from "@/lib/api";
 import type { CitationResult, ConversationTurn } from "@/lib/api";
 import type { SelectedNode } from "@/lib/summa-full";
 import { cn } from "@/lib/utils";
@@ -160,22 +160,26 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         } else if (event.type === "error") {
           ensureMessage();
           setStreamStatus(null);
+          const streamErrMsg =
+            event.message === "Agent search limit reached"
+              ? "Search limit reached. Try a more specific question."
+              : event.message === "Internal server error"
+              ? "Server error. Please try again."
+              : event.message || "Request failed.";
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: event.message || "Request failed." }
-                : m,
+              m.id === assistantId ? { ...m, content: streamErrMsg } : m,
             ),
           );
         }
       }
-    } catch {
+    } catch (err) {
       ensureMessage();
       setStreamStatus(null);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: "Request failed. Is the backend running?" }
+            ? { ...m, content: getErrorMessage(err, "query") }
             : m,
         ),
       );

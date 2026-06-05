@@ -7,11 +7,19 @@ export async function GET(request: NextRequest) {
   const query = searchParams.get("query");
   if (!query) return NextResponse.json({ error: "query parameter required" }, { status: 400 });
 
+  let response: Response;
   try {
-    const response = await fetch(`${BACKEND}/passages/?${searchParams.toString()}`);
-    if (!response.ok) return NextResponse.json({ error: "Backend error" }, { status: response.status });
-    return NextResponse.json(await response.json());
+    response = await fetch(`${BACKEND}/passages/?${searchParams.toString()}`);
   } catch {
-    return NextResponse.json({ error: "Failed to retrieve passages" }, { status: 500 });
+    return NextResponse.json({ error: "Cannot reach backend" }, { status: 503 });
   }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    return NextResponse.json(
+      { error: body?.detail ?? "Backend error" },
+      { status: response.status },
+    );
+  }
+  return NextResponse.json(await response.json());
 }
