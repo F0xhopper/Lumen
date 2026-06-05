@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Passage, QuestionMatch } from "@/lib/api";
 import { PART_ID_TO_SLUG } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
   const tokens = query
@@ -35,6 +36,8 @@ const SKELETON_WIDTHS: string[][] = [
   ["100%", "92%", "97%", "85%", "78%"],
   ["100%", "88%", "94%", "91%", "68%"],
   ["100%", "95%", "82%", "89%", "74%"],
+  ["100%", "90%", "96%", "83%", "71%"],
+  ["100%", "87%", "93%", "88%", "66%"],
 ];
 
 export function SearchLoadingSkeleton() {
@@ -44,7 +47,7 @@ export function SearchLoadingSkeleton() {
         <div
           key={cardIndex}
           className="space-y-3"
-          style={{ opacity: 1 - cardIndex * 0.2 }}
+          style={{ opacity: Math.max(0.15, 1 - cardIndex * 0.18) }}
         >
           <div className="flex items-center gap-2">
             <div className="h-[7px] w-14 rounded-sm bg-foreground/[0.06] animate-pulse" />
@@ -58,13 +61,97 @@ export function SearchLoadingSkeleton() {
                 className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse"
                 style={{
                   width: w,
-                  animationDelay: `${(cardIndex * lines.length + lineIndex) * 60}ms`,
+                  animationDelay: `${(cardIndex * lines.length + lineIndex) * 55}ms`,
                 }}
               />
             ))}
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const OBJ_LINES = [
+  ["100%", "92%", "97%", "85%", "78%"],
+  ["100%", "88%", "94%", "91%", "68%"],
+  ["100%", "95%", "82%", "89%", "74%"],
+];
+const RESPONDEO_LINES = ["100%", "97%", "93%", "100%", "89%", "95%", "82%", "76%"];
+const REPLY_LINES = [
+  ["100%", "91%", "88%", "79%"],
+  ["100%", "94%", "86%", "83%"],
+  ["100%", "89%", "92%", "68%"],
+];
+
+export function ArticleLoadingSkeleton() {
+  let tick = 0;
+  const delay = () => `${(tick++) * 45}ms`;
+
+  return (
+    <div>
+      <div className="space-y-9">
+        {OBJ_LINES.map((lines, i) => (
+          <div key={i} className="grid grid-cols-1 md:grid-cols-2">
+            <div className="md:pr-8 space-y-[10px]">
+              <div className="h-[9px] w-[38%] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ animationDelay: delay() }} />
+              {lines.map((w, j) => (
+                <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="h-px bg-foreground/[0.05] my-9" />
+
+      <div className="grid grid-cols-1 md:grid-cols-2">
+        <div className="md:pr-8 bg-foreground/[0.02] -mx-4 px-4 py-4 rounded space-y-[10px]">
+          <div className="h-[9px] w-[44%] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ animationDelay: delay() }} />
+          {RESPONDEO_LINES.map((w, j) => (
+            <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
+          ))}
+        </div>
+      </div>
+
+      <div className="h-px bg-foreground/[0.05] my-9" />
+
+      <div className="space-y-9">
+        {REPLY_LINES.map((lines, i) => (
+          <div key={i} className="grid grid-cols-1 md:grid-cols-2">
+            <div className="md:pr-8 space-y-[10px]">
+              <div className="h-[9px] w-[42%] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ animationDelay: delay() }} />
+              {lines.map((w, j) => (
+                <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function EmptySearchState({ query }: { query: string }) {
+  return (
+    <div className="flex flex-col items-center py-16 gap-4 text-center">
+      <span className="text-[28px] leading-none text-muted-foreground/[0.12] select-none">✦</span>
+      <div className="space-y-1">
+        <p className="font-cardo italic text-[15px] text-muted-foreground/35 leading-snug">
+          No passages found
+        </p>
+        {query && (
+          <p className="font-inter text-[10px] text-muted-foreground/25 tracking-wide">
+            for &ldquo;{query}&rdquo;
+          </p>
+        )}
+      </div>
+      <p className={cn(
+        "font-inter text-[10px] text-muted-foreground/20 tracking-wide",
+        "leading-relaxed max-w-[200px]"
+      )}>
+        Try broader terms or phrases from the Summa text
+      </p>
     </div>
   );
 }
