@@ -3,7 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.articles.repository import ArticleRepository
 from app.articles.schemas import ArticleResponse, ArticleSummaryResponse
 from app.articles.service import ArticleNotFoundError, ArticleService
+from app.core.logging import get_logger
 from app.infrastructure.database import get_pool
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -34,3 +37,6 @@ async def get_article(
         return ArticleResponse.from_domain(article)
     except ArticleNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except Exception as exc:
+        logger.error("Article fetch failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

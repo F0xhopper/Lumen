@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getAdjacentArticles, SUMMA_PARTS, type SelectedNode } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
-import { fetchArticle, fetchPassages, fetchQuestionMatches } from "@/lib/api";
+import { fetchArticle, fetchPassages, fetchQuestionMatches, ApiError, getErrorMessage } from "@/lib/api";
 import { PART_ABBR_TO_PART_ID, PART_ID_TO_SLUG, nodeUrl } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { ArticleView } from "./ArticleView";
@@ -136,16 +136,22 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     ? (PART_ABBR_TO_PART_ID[selected.partAbbr] ?? selected.partId)
     : "";
 
+  const retryPolicy = (failureCount: number, error: unknown) => {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 400)) return false;
+    return failureCount < 1;
+  };
+
   const {
     data: article,
     isLoading: articleLoading,
     error: articleError,
+    refetch: refetchArticle,
   } = useQuery({
     queryKey: ["article", resolvedPartId, selected?.questionN, selected?.articleN],
     queryFn: () => fetchArticle(resolvedPartId, selected!.questionN, selected!.articleN!),
     enabled: isArticleMode && !!selected,
     staleTime: Infinity,
-    retry: 1,
+    retry: retryPolicy,
   });
 
   const trimmedQuery = searchQuery.trim();
@@ -153,12 +159,13 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     data: passages = [],
     isLoading: passagesLoading,
     error: passagesError,
+    refetch: refetchPassages,
   } = useQuery({
     queryKey: ["passages", trimmedQuery],
     queryFn: () => fetchPassages(trimmedQuery),
     enabled: isSearchMode,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    retry: retryPolicy,
   });
 
   const { data: questionMatches = [] } = useQuery({
@@ -166,7 +173,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     queryFn: () => fetchQuestionMatches(trimmedQuery),
     enabled: isSearchMode,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    retry: retryPolicy,
   });
 
   const isLoading = articleLoading || passagesLoading;
@@ -299,13 +306,21 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
             </div>
           )}
 
-          {error && (
-            <p className="font-inter text-[11px] text-muted-foreground border border-border rounded p-4">
-              {isArticleMode
-                ? "Could not load article. Is the backend running?"
-                : "Could not retrieve passages. Is the backend running?"}
-            </p>
-          )}
+          {error ? (
+            <div className="border border-border rounded p-4 space-y-2">
+              <p className="font-inter text-[11px] text-muted-foreground">
+                {getErrorMessage(error, isArticleMode ? "article" : "search")}
+              </p>
+              {!(error instanceof ApiError && (error.status === 404 || error.status === 400)) && (
+                <button
+                  onClick={() => isArticleMode ? refetchArticle() : refetchPassages()}
+                  className="font-inter text-[10px] tracking-wide text-muted-foreground/50 hover:text-foreground/70 transition-colors"
+                >
+                  Try again
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {!isLoading && !error && isArticleMode && article && (
             <ArticleView article={article} />

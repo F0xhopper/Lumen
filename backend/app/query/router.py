@@ -3,7 +3,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIConnectionError as OpenAIConnectionError, RateLimitError
 
 from app.articles.repository import ArticleRepository
 from app.core.logging import get_logger
@@ -50,6 +50,12 @@ async def query(req: QueryRequest, svc: QueryService = Depends(_get_service)):
             pinned_sections=req.pinned_sections,
             conversation_history=req.conversation_history,
         )
+    except RateLimitError as exc:
+        logger.error("OpenAI rate limit in query: %s", exc)
+        raise HTTPException(status_code=429, detail="AI service rate limit reached. Please try again shortly.")
+    except OpenAIConnectionError as exc:
+        logger.error("OpenAI connection error in query: %s", exc)
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable. Please try again.")
     except Exception as exc:
         logger.error("Query failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -179,9 +185,15 @@ async def query_stream(
 
             yield f"data: {json.dumps({'type': 'error', 'message': 'Agent search limit reached'})}\n\n"
 
+        except RateLimitError as exc:
+            logger.error("OpenAI rate limit in stream: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': 'AI service rate limit reached. Please try again shortly.'})}\n\n"
+        except OpenAIConnectionError as exc:
+            logger.error("OpenAI connection error in stream: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': 'AI service temporarily unavailable. Please try again.'})}\n\n"
         except Exception as exc:
             logger.error("Stream error: %s", exc, exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Internal server error'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Internal server error. Please try again.'})}\n\n"
 
     return StreamingResponse(
         event_stream(),

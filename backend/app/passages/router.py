@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIConnectionError as OpenAIConnectionError, RateLimitError
 
 from app.articles.repository import ArticleRepository
 from app.core.logging import get_logger
@@ -45,6 +45,12 @@ async def search_passages(
 ):
     try:
         return await svc.search(query, top_k=top_k, min_score=min_score)
+    except RateLimitError as exc:
+        logger.error("OpenAI rate limit in passage search: %s", exc)
+        raise HTTPException(status_code=429, detail="AI service rate limit reached. Please try again shortly.")
+    except OpenAIConnectionError as exc:
+        logger.error("OpenAI connection error in passage search: %s", exc)
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable. Please try again.")
     except Exception as exc:
         logger.error("Passage search failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -59,6 +65,12 @@ async def search_questions(
 ):
     try:
         return await svc.search(q, top_k=top_k, min_score=min_score)
+    except RateLimitError as exc:
+        logger.error("OpenAI rate limit in question search: %s", exc)
+        raise HTTPException(status_code=429, detail="AI service rate limit reached. Please try again shortly.")
+    except OpenAIConnectionError as exc:
+        logger.error("OpenAI connection error in question search: %s", exc)
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable. Please try again.")
     except Exception as exc:
         logger.error("Question search failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
