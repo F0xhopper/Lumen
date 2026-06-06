@@ -6,8 +6,6 @@ import { useTheme } from "next-themes";
 import {
   Search,
   X,
-  PanelLeftOpen,
-  PanelLeftClose,
   PanelRightOpen,
   Menu,
   BookOpen,
@@ -16,6 +14,8 @@ import {
   PenLine,
   MessageSquare,
   UserCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
@@ -225,7 +225,7 @@ export default function SummaShell() {
       )}
 
       <header className="relative shrink-0 flex items-center h-12 border-b border-border px-2 z-10 bg-background">
-        {isMobile ? (
+        {isMobile && (
           <button
             ref={hamburgerRef}
             onClick={() => setLeftOpen((o) => !o)}
@@ -233,17 +233,6 @@ export default function SummaShell() {
             className="shrink-0 p-2.5 text-muted-foreground/50 hover:text-foreground transition-colors"
           >
             <Menu className="h-4 w-4" />
-          </button>
-        ) : (
-          <button
-            onClick={() => setLeftOpen((o) => !o)}
-            title={leftOpen ? "Collapse sidebar (b)" : "Expand sidebar (b)"}
-            className="shrink-0 p-2.5 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
-          >
-            {leftOpen
-              ? <PanelLeftClose className="h-3.5 w-3.5" />
-              : <PanelLeftOpen className="h-3.5 w-3.5" />
-            }
           </button>
         )}
 
@@ -321,7 +310,7 @@ export default function SummaShell() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden min-w-0">
+      <div className="flex flex-1 overflow-hidden min-w-0 relative">
         <aside
           className={cn(
             "shrink-0 flex flex-col overflow-hidden bg-background",
@@ -445,16 +434,31 @@ export default function SummaShell() {
           </div>
         </aside>
 
-        <div className="flex flex-col flex-1 overflow-hidden min-w-0 relative">
-          {!isMobile && leftOpen && (
+        {!isMobile && (
+          <div
+            onClick={() => setLeftOpen((o) => !o)}
+            title={leftOpen ? "Collapse sidebar (b)" : "Expand sidebar (b)"}
+            className="absolute inset-y-0 w-4 z-30 cursor-pointer group/edge transition-[left] duration-200 ease-in-out"
+            style={{ left: leftOpen ? LEFT_W : 0 }}
+          >
+            {leftOpen && (
+              <div className="absolute left-0 inset-y-0 w-[2px] bg-border group-hover/edge:bg-foreground/20 transition-colors duration-150" />
+            )}
             <div
-              onClick={() => setLeftOpen((o) => !o)}
-              title="Collapse sidebar"
-              className="absolute left-0 inset-y-0 w-4 z-20 cursor-pointer group/edge"
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-background border border-border text-muted-foreground/50 opacity-0 group-hover/edge:opacity-100 transition-all duration-200 shadow-sm hover:border-foreground/30 hover:text-foreground/70",
+                leftOpen ? "left-0 -translate-x-1/2" : "left-1.5"
+              )}
             >
-              <div className="absolute left-0 inset-y-0 w-[2px] bg-border group-hover/edge:bg-foreground/30 transition-colors duration-150" />
+              {leftOpen
+                ? <ChevronLeft className="h-3 w-3" />
+                : <ChevronRight className="h-3 w-3" />
+              }
             </div>
-          )}
+          </div>
+        )}
+
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           {/* AI panel edge handle — hidden while AI panel is disabled
           {!isMobile && rightOpen && (
             <div
