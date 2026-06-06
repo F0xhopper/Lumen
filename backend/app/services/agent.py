@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
+from app.articles.repository import ArticleRepository
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.passages.repository import PineconeRepository
@@ -16,9 +17,11 @@ logger = get_logger(__name__)
 
 _MAX_AGENT_STEPS = 3
 _PASSAGES_PER_SEARCH = 6
-_PASSAGE_MAX_CHARS = 1800
-_TOOL_RESULT_MAX_CHARS = 8000
+_PASSAGE_MAX_CHARS = 2800
+_TOOL_RESULT_MAX_CHARS = 14000
 _HISTORY_TURNS = 6
+_HISTORY_VERBATIM_TURNS = 2   # keep last N turns verbatim
+_HISTORY_SUMMARY_CHARS = 500  # truncate older assistant messages to this
 
 _VALID_PART_ABBRS = frozenset({"I", "I-II", "II-II", "III"})
 
@@ -27,6 +30,13 @@ _PART_TO_SLUG: dict[str, str] = {
     "I-II": "1-2",
     "II-II": "2-2",
     "III": "3",
+}
+
+_PART_ABBR_TO_ID: dict[str, str] = {
+    "I": "prima-pars",
+    "I-II": "prima-secundae",
+    "II-II": "secunda-secundae",
+    "III": "tertia-pars",
 }
 
 _SEARCH_TOOL = {
@@ -57,6 +67,41 @@ _SEARCH_TOOL = {
     },
 }
 
+_GET_ARTICLE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_article",
+        "description": (
+            "Fetch the complete, untruncated text of a specific Summa Theologica article, "
+            "including every objection and its paired reply. Use this when you know the exact "
+            "article you need — from a [Viewing:] context signal, a prior search result, or a "
+            "citation. Prefer this over search_summa for the currently-viewed article. "
+            "Do not use it for topic discovery."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "part_abbr": {
+                    "type": "string",
+                    "description": "Summa part abbreviation",
+                    "enum": ["I", "I-II", "II-II", "III"],
+                },
+                "question_n": {
+                    "type": "integer",
+                    "description": "Question number",
+                },
+                "article_n": {
+                    "type": "integer",
+                    "description": "Article number",
+                },
+            },
+            "required": ["part_abbr", "question_n", "article_n"],
+        },
+    },
+}
+
+_AGENT_TOOLS = [_SEARCH_TOOL, _GET_ARTICLE_TOOL]
+
 _SYSTEM_PROMPT = """\
 You are a scholarly assistant for advanced study of the Summa Theologica of St. Thomas Aquinas. \
 Your interlocutors are theologians, philosophers, and serious students who know the text. \
@@ -64,8 +109,19 @@ Your role is to give them Aquinas's own words, precisely located and honestly fr
 
 ## WORKFLOW
 
-1. Call search_summa with a focused query. Call it up to 3 times with different angles \
-(e.g. the principal term, a key objection, a related question or parallel locus) to gather sufficient evidence.
+0. **Decompose multi-part questions.** If the question covers multiple distinct sub-questions or \
+topics (e.g. "What does Aquinas say about X, and how does this relate to Y?"), identify each part \
+before your first tool call. Devote one tool call per sub-question so no strand goes unaddressed.
+
+1. **Retrieve evidence.** You have two tools:
+   - **search_summa** — semantic + keyword search across the full corpus. Use for topic-based \
+discovery. Call up to 3 times with different angles (principal term, key objection, related \
+question or parallel locus).
+   - **get_article** — fetches the *complete* text of a specific article, including every \
+objection and reply, untruncated. Use this when you already know the exact article (from a \
+[Viewing:] signal, a prior search hit, or a citation). Prefer get_article over search_summa \
+for the currently-viewed article.
+
 2. Write your answer grounded solely in the retrieved passages. Every substantive claim must be \
 anchored to a direct quotation — no paraphrase dressed as quotation, no reconstruction from memory.
 3. If the retrieved passages do not directly address the question, say so plainly. Name the \
@@ -78,7 +134,7 @@ than summarising from training data.
 The user's message may open with one or more signals:
 
 **[Viewing: ST I Q.2 — "Whether God exists"]**
-→ The user is reading this article. Direct your first search_summa call at it. \
+→ The user is reading this article. Call get_article on it as your first tool call. \
 Treat vague follow-up questions as about it unless stated otherwise.
 
 **[Quote: "…text…" (ST I Q.2 A.3 — respondeo)]**
@@ -205,6 +261,91 @@ def _passage_to_tool_result(passages: list[PassageResult]) -> str:
     return _truncate("\n\n---\n\n".join(lines), _TOOL_RESULT_MAX_CHARS)
 
 
+def _format_article_for_agent(article) -> str:
+    """Format a full Article object as a tool result with PASSAGE headers for each section."""
+    lines = [
+        f"[ARTICLE|{article.part_abbr}|{article.question_n}|{article.article_n}]",
+        f"ST {article.part_abbr} Q.{article.question_n} — {article.question_title}",
+        f"A.{article.article_n} — {article.article_title}",
+        "",
+    ]
+    if article.sed_contra:
+        lines += [
+            f"[PASSAGE|{article.part_abbr}|{article.question_n}|{article.article_n}"
+            f"|sed_contra|On the contrary|{article.article_title}|{article.question_title}]",
+            "SED CONTRA:",
+            article.sed_contra,
+            "",
+        ]
+    if article.respondeo:
+        lines += [
+            f"[PASSAGE|{article.part_abbr}|{article.question_n}|{article.article_n}"
+            f"|respondeo|I answer that|{article.article_title}|{article.question_title}]",
+            "RESPONDEO:",
+            article.respondeo,
+            "",
+        ]
+    for obj in article.objections:
+        lines += [
+            f"[PASSAGE|{article.part_abbr}|{article.question_n}|{article.article_n}"
+            f"|objection_{obj.n}|Objection {obj.n}|{article.article_title}|{article.question_title}]",
+            f"OBJECTION {obj.n}:",
+            obj.text,
+            "",
+        ]
+    for rep in article.replies:
+        lines += [
+            f"[PASSAGE|{article.part_abbr}|{article.question_n}|{article.article_n}"
+            f"|reply_{rep.n}|Reply to Objection {rep.n}|{article.article_title}|{article.question_title}]",
+            f"REPLY TO OBJECTION {rep.n}:",
+            rep.text,
+            "",
+        ]
+    return _truncate("\n".join(lines), _TOOL_RESULT_MAX_CHARS)
+
+
+def _article_to_passages(article) -> list[PassageResult]:
+    """Convert a full Article into PassageResult entries for citation matching."""
+    slug = _PART_TO_SLUG.get(article.part_abbr, article.part_abbr.lower())
+    article_url = f"/{slug}/{article.question_n}/{article.article_n}"
+    source_url = article.source_url or ""
+
+    results: list[PassageResult] = []
+    if article.sed_contra:
+        results.append(PassageResult(
+            rank=0, text=article.sed_contra, score=1.0,
+            part_abbr=article.part_abbr, question_n=article.question_n, article_n=article.article_n,
+            question_title=article.question_title, article_title=article.article_title,
+            section="sed_contra", section_label="On the contrary",
+            url_fragment="sed-contra", article_url=article_url, source_url=source_url,
+        ))
+    if article.respondeo:
+        results.append(PassageResult(
+            rank=0, text=article.respondeo, score=1.0,
+            part_abbr=article.part_abbr, question_n=article.question_n, article_n=article.article_n,
+            question_title=article.question_title, article_title=article.article_title,
+            section="respondeo", section_label="I answer that",
+            url_fragment="respondeo", article_url=article_url, source_url=source_url,
+        ))
+    for obj in article.objections:
+        results.append(PassageResult(
+            rank=0, text=obj.text, score=1.0,
+            part_abbr=article.part_abbr, question_n=article.question_n, article_n=article.article_n,
+            question_title=article.question_title, article_title=article.article_title,
+            section=f"objection_{obj.n}", section_label=f"Objection {obj.n}",
+            url_fragment=f"objection-{obj.n}", article_url=article_url, source_url=source_url,
+        ))
+    for rep in article.replies:
+        results.append(PassageResult(
+            rank=0, text=rep.text, score=1.0,
+            part_abbr=article.part_abbr, question_n=article.question_n, article_n=article.article_n,
+            question_title=article.question_title, article_title=article.article_title,
+            section=f"reply_{rep.n}", section_label=f"Reply to Objection {rep.n}",
+            url_fragment=f"reply-{rep.n}", article_url=article_url, source_url=source_url,
+        ))
+    return results
+
+
 def _deduplicate_passages(passages: list[PassageResult]) -> list[PassageResult]:
     seen: set[tuple] = set()
     out: list[PassageResult] = []
@@ -216,6 +357,26 @@ def _deduplicate_passages(passages: list[PassageResult]) -> list[PassageResult]:
     return out
 
 
+def _compact_history(
+    turns: list[ConversationTurn],
+) -> list[ConversationTurn]:
+    """Keep the last _HISTORY_VERBATIM_TURNS turns verbatim; truncate older assistant messages."""
+    if len(turns) <= _HISTORY_VERBATIM_TURNS:
+        return turns
+    older = turns[:-_HISTORY_VERBATIM_TURNS]
+    recent = turns[-_HISTORY_VERBATIM_TURNS:]
+    compacted = []
+    for t in older:
+        if t.role == "assistant" and len(t.content) > _HISTORY_SUMMARY_CHARS:
+            compacted.append(ConversationTurn(
+                role=t.role,
+                content=t.content[:_HISTORY_SUMMARY_CHARS].rstrip() + " …[condensed]",
+            ))
+        else:
+            compacted.append(t)
+    return compacted + recent
+
+
 def _build_initial_messages(
     query: str,
     pinned_sections: list[PinnedSection],
@@ -224,7 +385,8 @@ def _build_initial_messages(
     messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
     ]
-    for turn in conversation_history[-_HISTORY_TURNS:]:
+    history = _compact_history(conversation_history[-_HISTORY_TURNS:])
+    for turn in history:
         messages.append({"role": turn.role, "content": turn.content})  # type: ignore[misc]
 
     user_parts: list[str] = []
@@ -350,9 +512,33 @@ async def _execute_tool_call(
     tc,
     fallback_query: str,
     client: AsyncOpenAI,
-    article_repo,
+    article_repo: ArticleRepository,
     pinecone_repo: PineconeRepository,
 ) -> tuple[str, list[PassageResult]]:
+    name = tc.function.name
+
+    if name == "get_article":
+        try:
+            args = json.loads(tc.function.arguments)
+            part_abbr = args["part_abbr"]
+            question_n = int(args["question_n"])
+            article_n = int(args["article_n"])
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.warning("get_article bad args (%s) — falling back to search", exc)
+            return fallback_query, []
+
+        part_id = _PART_ABBR_TO_ID.get(part_abbr)
+        if not part_id:
+            logger.warning("get_article unknown part_abbr %r", part_abbr)
+            return fallback_query, []
+
+        logger.info("Agent get_article: %s Q.%d A.%d", part_abbr, question_n, article_n)
+        article = await article_repo.get_article(part_id, question_n, article_n)
+        if not article:
+            return f"ST {part_abbr} Q.{question_n} A.{article_n}", []
+        return f"ST {part_abbr} Q.{question_n} A.{article_n}", _article_to_passages(article)
+
+    # search_summa
     try:
         args = json.loads(tc.function.arguments)
         search_query = args.get("query", fallback_query)
@@ -372,11 +558,39 @@ async def _execute_tool_call(
     return search_query, passages
 
 
+async def _tool_result_content(
+    tc,
+    fallback_query: str,
+    client: AsyncOpenAI,
+    article_repo: ArticleRepository,
+    pinecone_repo: PineconeRepository,
+    all_passages: list[PassageResult],
+) -> tuple[str, str, list[PassageResult]]:
+    """Execute a tool call and return (label, content_str, new_passages)."""
+    label, passages = await _execute_tool_call(
+        tc, fallback_query, client, article_repo, pinecone_repo
+    )
+    name = tc.function.name
+
+    if name == "get_article" and passages:
+        # Reconstruct the article object indirectly via the passage list
+        # Format using the passage data (already structured)
+        content = _passage_to_tool_result(passages)
+    elif name == "get_article":
+        # Article not found
+        content = f"Article not found: {label}"
+    else:
+        content = _passage_to_tool_result(passages)
+
+    all_passages.extend(passages)
+    return label, content, passages
+
+
 async def run_agent(
     query: str,
     client: AsyncOpenAI,
     pinecone_repo: PineconeRepository,
-    article_repo,
+    article_repo: ArticleRepository,
     pinned_sections: list[PinnedSection] | None = None,
     conversation_history: list[ConversationTurn] | None = None,
 ) -> AgentResult:
@@ -392,10 +606,10 @@ async def run_agent(
         response = await client.chat.completions.create(
             model=settings.CHAT_MODEL,
             messages=messages,
-            tools=[_SEARCH_TOOL],  # type: ignore[list-item]
+            tools=_AGENT_TOOLS,  # type: ignore[list-item]
             tool_choice="auto",
             temperature=0.2,
-            max_tokens=2500,
+            max_tokens=3500,
         )
 
         choice = response.choices[0]
@@ -403,17 +617,25 @@ async def run_agent(
 
         if choice.finish_reason == "tool_calls" and choice.message.tool_calls:
             for tc in choice.message.tool_calls:
-                if tc.function.name != "search_summa":
+                if tc.function.name not in {"search_summa", "get_article"}:
                     continue
                 agent_steps += 1
                 _, passages = await _execute_tool_call(
                     tc, query, client, article_repo, pinecone_repo
                 )
                 all_passages.extend(passages)
+
+                # Format content based on tool type
+                if tc.function.name == "get_article":
+                    # Re-format using article passage list with PASSAGE headers
+                    content = _passage_to_tool_result(passages) if passages else "Article not found."
+                else:
+                    content = _passage_to_tool_result(passages)
+
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": _passage_to_tool_result(passages),
+                    "content": content,
                 })
         else:
             raw_answer = choice.message.content or ""

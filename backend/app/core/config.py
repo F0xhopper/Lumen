@@ -15,7 +15,7 @@ class Settings:
     CHAT_MODEL: str = "gpt-4.1"
     HYDE_MODEL: str = "gpt-4.1-mini"
 
-    RERANKER_MODEL: str = os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    RERANKER_MODEL: str = os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-electra-base")
 
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "lumen-summa")

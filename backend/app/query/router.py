@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI, APIConnectionError as OpenAIConnectionError, RateLimitError
 
 from app.articles.repository import ArticleRepository
+from app.core.config import settings
 from app.core.logging import get_logger
 from app.infrastructure.database import get_pool
 from app.infrastructure.openai import get_openai_client
@@ -15,14 +16,16 @@ from app.passages.schemas import PassageResult
 from app.query.schemas import QueryRequest, QueryResponse
 from app.query.service import QueryService
 from app.services.agent import (
+    _AGENT_TOOLS,
     _MAX_AGENT_STEPS,
+    _PART_ABBR_TO_ID,
     _PASSAGES_PER_SEARCH,
-    _SEARCH_TOOL,
     _build_initial_messages,
     _deduplicate_passages,
     _normalize_inline_refs,
     _parse_citations_block,
     _passage_to_tool_result,
+    _article_to_passages,
 )
 from app.services.retrieval import combined_search
 
@@ -88,12 +91,12 @@ async def query_stream(
 
             for _ in range(_MAX_AGENT_STEPS + 1):
                 stream = await openai_client.chat.completions.create(
-                    model="gpt-4.1",
+                    model=settings.CHAT_MODEL,
                     messages=messages,
-                    tools=[_SEARCH_TOOL],  # type: ignore[list-item]
+                    tools=_AGENT_TOOLS,  # type: ignore[list-item]
                     tool_choice="auto",
                     temperature=0.2,
-                    max_tokens=2500,
+                    max_tokens=3500,
                     stream=True,
                 )
 
@@ -143,37 +146,66 @@ async def query_stream(
                     messages.append({"role": "assistant", "content": None, "tool_calls": tool_calls})
 
                     for tc in tool_calls:
-                        if tc["function"]["name"] != "search_summa":
+                        fn_name = tc["function"]["name"]
+                        if fn_name not in {"search_summa", "get_article"}:
                             continue
                         agent_steps += 1
-                        try:
-                            preview_query = json.loads(tc["function"]["arguments"]).get("query", req.query)
-                        except Exception:
-                            preview_query = req.query
-                        yield f"data: {json.dumps({'type': 'status', 'message': f'Searching: {preview_query}'})}\n\n"
-                        await asyncio.sleep(0)
-                        try:
-                            args = json.loads(tc["function"]["arguments"])
-                            search_query = args.get("query", req.query)
-                            top_k = min(int(args.get("top_k", _PASSAGES_PER_SEARCH)), 10)
-                        except (json.JSONDecodeError, ValueError):
-                            search_query = req.query
-                            top_k = _PASSAGES_PER_SEARCH
-                        passages = await combined_search(
-                            search_query,
-                            client=openai_client,
-                            article_repo=article_repo,
-                            pinecone_repo=pinecone_repo,
-                            top_k=top_k,
-                        )
-                        all_passages.extend(passages)
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc["id"],
-                            "content": _passage_to_tool_result(passages),
-                        })
-                        yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(passages)} passages — writing answer…'})}\n\n"
-                        await asyncio.sleep(0)
+
+                        if fn_name == "get_article":
+                            try:
+                                args = json.loads(tc["function"]["arguments"])
+                                part_abbr = args["part_abbr"]
+                                question_n = int(args["question_n"])
+                                article_n = int(args["article_n"])
+                            except (json.JSONDecodeError, KeyError, ValueError):
+                                part_abbr, question_n, article_n = "I", 1, 1
+                            label = f"ST {part_abbr} Q.{question_n} A.{article_n}"
+                            yield f"data: {json.dumps({'type': 'status', 'message': f'Fetching {label}…'})}\n\n"
+                            await asyncio.sleep(0)
+                            part_id = _PART_ABBR_TO_ID.get(part_abbr)
+                            passages = []
+                            if part_id:
+                                article = await article_repo.get_article(part_id, question_n, article_n)
+                                if article:
+                                    passages = _article_to_passages(article)
+                            all_passages.extend(passages)
+                            content = _passage_to_tool_result(passages) if passages else "Article not found."
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tc["id"],
+                                "content": content,
+                            })
+                            yield f"data: {json.dumps({'type': 'status', 'message': f'Fetched {label} — writing answer…'})}\n\n"
+                            await asyncio.sleep(0)
+                        else:
+                            try:
+                                preview_query = json.loads(tc["function"]["arguments"]).get("query", req.query)
+                            except Exception:
+                                preview_query = req.query
+                            yield f"data: {json.dumps({'type': 'status', 'message': f'Searching: {preview_query}'})}\n\n"
+                            await asyncio.sleep(0)
+                            try:
+                                args = json.loads(tc["function"]["arguments"])
+                                search_query = args.get("query", req.query)
+                                top_k = min(int(args.get("top_k", _PASSAGES_PER_SEARCH)), 10)
+                            except (json.JSONDecodeError, ValueError):
+                                search_query = req.query
+                                top_k = _PASSAGES_PER_SEARCH
+                            passages = await combined_search(
+                                search_query,
+                                client=openai_client,
+                                article_repo=article_repo,
+                                pinecone_repo=pinecone_repo,
+                                top_k=top_k,
+                            )
+                            all_passages.extend(passages)
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tc["id"],
+                                "content": _passage_to_tool_result(passages),
+                            })
+                            yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(passages)} passages — writing answer…'})}\n\n"
+                            await asyncio.sleep(0)
 
                 elif is_text is True:
                     if not stop_streaming and line_buf and not line_buf.strip().startswith(CITATIONS_MARKER):
