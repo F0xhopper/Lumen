@@ -7,12 +7,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getAdjacentArticles, SUMMA_PARTS, type SelectedNode } from "@/lib/summa-full";
 import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
-import { fetchArticle, fetchPassages, fetchQuestionMatches } from "@/lib/api";
+import { fetchArticle, fetchPassages, fetchQuestionMatches, ApiError, getErrorMessage } from "@/lib/api";
 import { PART_ABBR_TO_PART_ID, PART_ID_TO_SLUG, nodeUrl } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { ArticleView } from "./ArticleView";
-import { PassageList, QuestionJumpList, SearchLoadingSkeleton } from "./PassageList";
+import { PassageList, QuestionJumpList, SearchLoadingSkeleton, ArticleLoadingSkeleton, EmptySearchState } from "./PassageList";
 import { HighlightMenu, type HighlightState } from "./HighlightMenu";
+import BookmarkButton from "./BookmarkButton";
 
 function ContentHeader({
   isSearchMode,
@@ -94,6 +95,14 @@ interface ContentViewerProps {
   onHighlightNote?: (text: string) => void;
   onHighlightSearch?: (text: string) => void;
   onHighlightAddToChat?: (text: string) => void;
+  isBookmarked?: boolean;
+  bookmarkId?: string | null;
+  bookmarkFolder?: string | null;
+  bookmarkFolders?: string[];
+  isSignedIn?: boolean;
+  onAddBookmark?: (node: SelectedNode, folder?: string | null) => void;
+  onRemoveBookmark?: (id: string) => void;
+  onSignIn?: () => void;
 }
 
 const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
@@ -107,6 +116,14 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
       onHighlightNote,
       onHighlightSearch,
       onHighlightAddToChat,
+      isBookmarked = false,
+      bookmarkId = null,
+      bookmarkFolder = null,
+      bookmarkFolders = [],
+      isSignedIn = false,
+      onAddBookmark,
+      onRemoveBookmark,
+      onSignIn,
     },
     ref
   ) {
@@ -136,16 +153,22 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     ? (PART_ABBR_TO_PART_ID[selected.partAbbr] ?? selected.partId)
     : "";
 
+  const retryPolicy = (failureCount: number, error: unknown) => {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 400)) return false;
+    return failureCount < 1;
+  };
+
   const {
     data: article,
     isLoading: articleLoading,
     error: articleError,
+    refetch: refetchArticle,
   } = useQuery({
     queryKey: ["article", resolvedPartId, selected?.questionN, selected?.articleN],
     queryFn: () => fetchArticle(resolvedPartId, selected!.questionN, selected!.articleN!),
     enabled: isArticleMode && !!selected,
     staleTime: Infinity,
-    retry: 1,
+    retry: retryPolicy,
   });
 
   const trimmedQuery = searchQuery.trim();
@@ -153,12 +176,13 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     data: passages = [],
     isLoading: passagesLoading,
     error: passagesError,
+    refetch: refetchPassages,
   } = useQuery({
     queryKey: ["passages", trimmedQuery],
     queryFn: () => fetchPassages(trimmedQuery),
     enabled: isSearchMode,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    retry: retryPolicy,
   });
 
   const { data: questionMatches = [] } = useQuery({
@@ -166,7 +190,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
     queryFn: () => fetchQuestionMatches(trimmedQuery),
     enabled: isSearchMode,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    retry: retryPolicy,
   });
 
   const isLoading = articleLoading || passagesLoading;
@@ -209,6 +233,10 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [selected?.partId, selected?.questionN, selected?.articleN]);
+
+  useEffect(() => {
+    if (scrollRef.current && trimmedQuery) scrollRef.current.scrollTop = 0;
+  }, [trimmedQuery]);
 
   useEffect(() => {
     if (!article) return;
@@ -284,6 +312,19 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
+              {selected && (
+                <BookmarkButton
+                  selected={selected}
+                  isBookmarked={isBookmarked}
+                  bookmarkId={bookmarkId}
+                  currentFolder={bookmarkFolder}
+                  folders={bookmarkFolders}
+                  isSignedIn={isSignedIn}
+                  onAdd={onAddBookmark ?? (() => {})}
+                  onRemove={onRemoveBookmark ?? (() => {})}
+                  onSignIn={onSignIn ?? (() => {})}
+                />
+              )}
             </div>
           )}
         </div>
@@ -293,19 +334,23 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
         <div className={cn("mx-auto", isSearchMode || isQuestionMode ? "max-w-prose" : "w-full")}>
           {isLoading && isSearchMode && <SearchLoadingSkeleton />}
 
-          {isLoading && isArticleMode && (
-            <div className="py-2">
-              <span className="text-[9px] text-muted-foreground/20 animate-pulse select-none">✦</span>
-            </div>
-          )}
+          {isLoading && isArticleMode && <ArticleLoadingSkeleton />}
 
-          {error && (
-            <p className="font-inter text-[11px] text-muted-foreground border border-border rounded p-4">
-              {isArticleMode
-                ? "Could not load article. Is the backend running?"
-                : "Could not retrieve passages. Is the backend running?"}
-            </p>
-          )}
+          {error ? (
+            <div className="border border-border rounded p-4 space-y-2">
+              <p className="font-inter text-[11px] text-muted-foreground">
+                {getErrorMessage(error, isArticleMode ? "article" : "search")}
+              </p>
+              {!(error instanceof ApiError && (error.status === 404 || error.status === 400)) && (
+                <button
+                  onClick={() => isArticleMode ? refetchArticle() : refetchPassages()}
+                  className="font-inter text-[10px] tracking-wide text-muted-foreground/50 hover:text-foreground/70 transition-colors"
+                >
+                  Try again
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {!isLoading && !error && isArticleMode && article && (
             <ArticleView article={article} />
@@ -352,9 +397,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
           )}
 
           {!isLoading && !error && isSearchMode && passages.length === 0 && questionMatches.length === 0 && (
-            <p className="font-cardo italic text-[13px] text-muted-foreground/40">
-              No passages retrieved. The index may not contain this text yet.
-            </p>
+            <EmptySearchState query={trimmedQuery} />
           )}
 
           {!isLoading && isSearchMode && passages.length > 0 && (

@@ -1,3 +1,45 @@
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message?: string,
+  ) {
+    super(message ?? `Request failed with status ${status}`);
+    this.name = "ApiError";
+  }
+}
+
+export function getErrorMessage(
+  error: unknown,
+  context: "article" | "search" | "query",
+): string {
+  const status = error instanceof ApiError ? error.status : null;
+
+  if (
+    status === 0 ||
+    error instanceof TypeError ||
+    (error instanceof Error && error.message.toLowerCase().includes("failed to fetch"))
+  ) {
+    return "Cannot reach the server. Is the backend running?";
+  }
+  if (status === 404) {
+    return context === "article"
+      ? "Article not found. It may not have been indexed yet."
+      : "No results found.";
+  }
+  if (status === 429) {
+    return "Too many requests. Please wait a moment and try again.";
+  }
+  if (status === 503) {
+    return "A required service is temporarily unavailable. Please try again shortly.";
+  }
+  if (status !== null && status >= 500) {
+    return "Server error. Please try again.";
+  }
+  if (context === "article") return "Could not load article. Please try again.";
+  if (context === "search") return "Could not retrieve results. Please try again.";
+  return "An unexpected error occurred. Please try again.";
+}
+
 export interface SectionItem {
   n: number;
   text: string;
@@ -107,16 +149,26 @@ export async function fetchArticle(
   questionN: number,
   articleN: number,
 ): Promise<Article> {
-  const res = await fetch(`/data/articles/${partId}-q${questionN}-a${articleN}.json`);
-  if (!res.ok) throw new Error(`${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`/data/articles/${partId}-q${questionN}-a${articleN}.json`);
+  } catch {
+    throw new ApiError(0, "Network error");
+  }
+  if (!res.ok) throw new ApiError(res.status);
   return res.json();
 }
 
 export async function fetchPassages(query: string, topK = 8): Promise<Passage[]> {
-  const res = await fetch(
-    `/api/passages?query=${encodeURIComponent(query.trim())}&top_k=${topK}`,
-  );
-  if (!res.ok) throw new Error(`${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/passages?query=${encodeURIComponent(query.trim())}&top_k=${topK}`,
+    );
+  } catch {
+    throw new ApiError(0, "Network error");
+  }
+  if (!res.ok) throw new ApiError(res.status);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
@@ -144,12 +196,17 @@ export type StreamEvent =
   | { type: "error"; message: string };
 
 export async function* streamQuery(req: QueryRequest): AsyncGenerator<StreamEvent> {
-  const res = await fetch("/api/query/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
-  });
-  if (!res.ok || !res.body) throw new Error(`${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch("/api/query/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+  } catch {
+    throw new ApiError(0, "Network error");
+  }
+  if (!res.ok || !res.body) throw new ApiError(res.status || 500);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

@@ -66,12 +66,14 @@ export async function recordVisit(data: {
   part_id: string;
   question_n: number;
   article_n?: number | null;
-}): Promise<void> {
-  await fetch("/api/history", {
+}): Promise<HistoryEntry | null> {
+  const res = await fetch("/api/history", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+  if (!res.ok) return null;
+  return res.json();
 }
 
 export async function clearHistory(): Promise<void> {

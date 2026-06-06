@@ -4,7 +4,7 @@ import {
   useState, useRef, useEffect, useCallback,
   forwardRef, useImperativeHandle,
 } from "react";
-import { Send, Loader2, RotateCcw, PanelRightClose } from "lucide-react";
+import { Send, RotateCcw, PanelRightClose } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import {
   ContextArgChip,
@@ -12,7 +12,7 @@ import {
   buildContextPrefix,
   type ContextArg,
 } from "./ContextArgChip";
-import { streamQuery } from "@/lib/api";
+import { streamQuery, getErrorMessage } from "@/lib/api";
 import type { CitationResult, ConversationTurn } from "@/lib/api";
 import type { SelectedNode } from "@/lib/summa-full";
 import { cn } from "@/lib/utils";
@@ -160,22 +160,26 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         } else if (event.type === "error") {
           ensureMessage();
           setStreamStatus(null);
+          const streamErrMsg =
+            event.message === "Agent search limit reached"
+              ? "Search limit reached. Try a more specific question."
+              : event.message === "Internal server error"
+              ? "Server error. Please try again."
+              : event.message || "Request failed.";
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: event.message || "Request failed." }
-                : m,
+              m.id === assistantId ? { ...m, content: streamErrMsg } : m,
             ),
           );
         }
       }
-    } catch {
+    } catch (err) {
       ensureMessage();
       setStreamStatus(null);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: "Request failed. Is the backend running?" }
+            ? { ...m, content: getErrorMessage(err, "query") }
             : m,
         ),
       );
@@ -309,11 +313,21 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         ))}
 
         {isPending && (
-          <div className="flex items-center gap-2 pl-3 text-muted-foreground/35">
-            <Loader2 className="h-3 w-3 animate-spin shrink-0" />
-            <span className="font-inter text-[9px] tracking-wide truncate">
-              {streamStatus ?? "Thinking…"}
+          <div className="flex items-center gap-2 pl-1">
+            <span className="flex gap-[3px] items-center shrink-0 py-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="inline-block w-[3px] h-[3px] rounded-full bg-muted-foreground/30 animate-bounce"
+                  style={{ animationDelay: `${i * 120}ms`, animationDuration: "900ms" }}
+                />
+              ))}
             </span>
+            {streamStatus && (
+              <span className="font-inter text-[9px] tracking-wide text-muted-foreground/30 truncate transition-opacity duration-300">
+                {streamStatus}
+              </span>
+            )}
           </div>
         )}
 

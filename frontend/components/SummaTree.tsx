@@ -18,7 +18,7 @@ interface SummaTreeProps {
 }
 
 const TreatiseDivider = memo(({ label }: { label: string }) => (
-  <p className="px-3 pt-2.5 pb-1 text-[11px] uppercase tracking-[0.08em] font-medium select-none text-muted-foreground/55">
+  <p className="px-2 pt-3 pb-0.5 text-[9.5px] uppercase tracking-[0.1em] font-medium select-none text-muted-foreground/35">
     {label}
   </p>
 ));
@@ -36,13 +36,13 @@ const ArticleRow = memo(({ n, title, isSelected, onClick, onPrefetch }: {
     onPointerEnter={onPrefetch}
     data-selected={isSelected ? "" : undefined}
     className={cn(
-      "w-full text-left px-4 py-1.5 rounded transition-colors flex items-start gap-1.5 border-l-2",
+      "w-full text-left px-2 py-1.5 rounded-sm transition-colors flex items-baseline gap-1.5",
       isSelected
-        ? "border-foreground/40 bg-foreground/[0.07] text-foreground"
-        : "border-transparent text-muted-foreground/65 hover:text-foreground/80 hover:bg-foreground/[0.04]"
+        ? "bg-foreground/[0.08] text-foreground"
+        : "text-muted-foreground/55 hover:text-foreground/80 hover:bg-foreground/[0.04]"
     )}
   >
-    <span className="text-[11px] font-mono shrink-0 mt-px text-muted-foreground/55">A.{n}</span>
+    <span className="text-[10px] font-mono shrink-0 text-muted-foreground/35 tabular-nums">A{n}</span>
     {title && <span className="text-[11px] leading-snug">{title}</span>}
   </button>
 ));
@@ -69,20 +69,20 @@ const QuestionRow = memo(({
         onClick={onToggle}
         data-selected={isQSelected ? "" : undefined}
         className={cn(
-          "w-full flex items-start gap-1 px-2 py-3 md:py-2.5 rounded text-left transition-colors group border-l-2",
+          "w-full flex items-start gap-1.5 px-2 py-[7px] rounded-sm text-left transition-colors group",
           isQSelected
-            ? "border-foreground/40 bg-foreground/[0.07]"
-            : "border-transparent hover:bg-foreground/[0.04]"
+            ? "bg-foreground/[0.07] text-foreground"
+            : "hover:bg-foreground/[0.04]"
         )}
       >
-        <ChevronRight className={cn("h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/45 transition-transform", expanded && "rotate-90")} />
-        <span className="text-[11px] font-mono text-muted-foreground/55 shrink-0 mt-px">{q.n}.</span>
-        <span className={cn("text-[12px] leading-snug", isQSelected ? "text-foreground" : "text-foreground/75 group-hover:text-foreground/95")}>
+        <ChevronRight className={cn("h-2.5 w-2.5 mt-[3px] shrink-0 text-muted-foreground/35 transition-transform duration-150", expanded && "rotate-90")} />
+        <span className="text-[10.5px] font-mono text-muted-foreground/40 shrink-0 tabular-nums">{q.n}.</span>
+        <span className={cn("text-[11.5px] leading-snug", isQSelected ? "text-foreground" : "text-foreground/70 group-hover:text-foreground/90")}>
           {q.title}
         </span>
       </button>
       {expanded && (
-        <div className="pl-5 border-l border-border/60 ml-5">
+        <div className="ml-[19px] pl-2.5 border-l border-border/40 mb-0.5">
           {Array.from({ length: articleCount }, (_, i) => i + 1).map((n) => (
             <ArticleRow
               key={n}
@@ -168,20 +168,21 @@ const SummaTree = forwardRef<SummaTreeHandle, SummaTreeProps>(function SummaTree
         ) : (
           SUMMA_PARTS.map((part) => {
             const partExpanded = expandedParts.has(part.id);
+            const qqCount = part.treatises.reduce((s, t) => s + t.questions.length, 0);
             return (
-              <div key={part.id}>
+              <div key={part.id} className="mb-0.5">
                 <button
                   onClick={() => togglePart(part.id)}
-                  className="w-full flex items-center gap-2 px-3 py-3.5 md:py-3 rounded hover:bg-foreground/[0.04] text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-sm hover:bg-foreground/[0.04] text-left transition-colors"
                 >
-                  <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground/45 transition-transform", partExpanded && "rotate-90")} />
-                  <div className="min-w-0">
-                    <p className="text-[13px] text-foreground leading-tight">{part.label}</p>
-                    <p className="text-[11px] text-muted-foreground/65 mt-0.5">{part.abbr} · {part.treatises.reduce((s, t) => s + t.questions.length, 0)} qq.</p>
+                  <ChevronRight className={cn("h-3 w-3 shrink-0 text-muted-foreground/35 transition-transform duration-150", partExpanded && "rotate-90")} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-medium text-foreground/85 leading-tight">{part.label}</p>
+                    <p className="text-[10px] text-muted-foreground/40 mt-0.5">{part.abbr} · {qqCount} qq.</p>
                   </div>
                 </button>
                 {partExpanded && (
-                  <div className="border-l border-border/60 ml-4">
+                  <div className="ml-4 pl-1 border-l border-border/50 pb-1">
                     {part.treatises.map((treatise, ti) => (
                       <div key={ti}>
                         <TreatiseDivider label={treatise.label} />

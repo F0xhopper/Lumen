@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   addBookmark,
@@ -19,7 +19,7 @@ export function useBookmarks(user: User | null) {
     fetchBookmarks().then(setBookmarks);
   }, [user?.id]);
 
-  const add = useCallback(async (node: SelectedNode) => {
+  const add = useCallback(async (node: SelectedNode, folder?: string | null) => {
     if (!user) return;
     const optimistic: Bookmark = {
       id: `temp-${Date.now()}`,
@@ -27,7 +27,7 @@ export function useBookmarks(user: User | null) {
       question_n: node.questionN,
       article_n: node.articleN ?? null,
       label: null,
-      folder: null,
+      folder: folder ?? null,
       created_at: new Date().toISOString(),
     };
     setBookmarks((prev) => [optimistic, ...prev]);
@@ -36,6 +36,7 @@ export function useBookmarks(user: User | null) {
       part_id: node.partId,
       question_n: node.questionN,
       article_n: node.articleN ?? null,
+      folder: folder ?? null,
     });
     if (saved) {
       setBookmarks((prev) => prev.map((b) => (b.id === optimistic.id ? saved : b)));
@@ -78,5 +79,24 @@ export function useBookmarks(user: User | null) {
     [bookmarks],
   );
 
-  return { bookmarks, add, remove, moveToFolder, isBookmarked, bookmarkId };
+  const bookmarkFolder = useCallback(
+    (node: SelectedNode) =>
+      bookmarks.find(
+        (b) =>
+          b.part_id === node.partId &&
+          b.question_n === node.questionN &&
+          (b.article_n ?? null) === (node.articleN ?? null),
+      )?.folder ?? null,
+    [bookmarks],
+  );
+
+  const folders = useMemo(
+    () =>
+      Array.from(
+        new Set(bookmarks.map((b) => b.folder).filter((f): f is string => f !== null)),
+      ).sort(),
+    [bookmarks],
+  );
+
+  return { bookmarks, add, remove, moveToFolder, isBookmarked, bookmarkId, bookmarkFolder, folders };
 }
