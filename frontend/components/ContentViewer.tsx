@@ -197,7 +197,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
   const error = articleError || passagesError;
 
   useEffect(() => {
-    const handleMouseUp = (e: MouseEvent) => {
+    const handlePointerUp = (e: PointerEvent) => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || !sel.rangeCount) { setHighlight(null); return; }
       const text = sel.toString().trim();
@@ -209,16 +209,16 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
       setHighlight({ text, rect: range.getBoundingClientRect(), mouseX: e.clientX, mouseY: e.clientY });
     };
 
-    const handleMouseDown = (e: MouseEvent) => {
+    const handlePointerDown = (e: PointerEvent) => {
       if ((e.target as HTMLElement).closest?.("[data-highlight-menu]")) return;
       setHighlight(null);
     };
 
-    document.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointerdown", handlePointerDown);
     return () => {
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, []);
 

@@ -17,11 +17,13 @@ from app.passages.router import router as passages_router
 from app.query.router import router as query_router
 from app.bookmarks.router import router as bookmarks_router
 from app.history.router import router as history_router
+from app.preferences.router import router as preferences_router
 
 # Domain module schema initialisation
 from app.articles.repository import ArticleRepository
 from app.bookmarks.repository import BookmarkRepository
 from app.history.repository import HistoryRepository
+from app.preferences.repository import PreferencesRepository
 
 setup_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
@@ -40,6 +42,7 @@ async def lifespan(app: FastAPI):
     await ArticleRepository(pool).ensure_schema()
     await BookmarkRepository(pool).ensure_schema()
     await HistoryRepository(pool).ensure_schema()
+    await PreferencesRepository(pool).ensure_schema()
 
     await asyncio.to_thread(init_retrieval)
     logger.info("Ready.")
@@ -68,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(query_router)
     app.include_router(bookmarks_router)
     app.include_router(history_router)
+    app.include_router(preferences_router)
 
     return app
 

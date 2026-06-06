@@ -9,8 +9,11 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        cardo: ["var(--font-cardo)", "Georgia", "serif"],
-        inter: ["var(--font-inter)", "system-ui", "sans-serif"],
+        cardo:       ["var(--font-cardo)", "Georgia", "serif"],
+        inter:       ["var(--font-inter)", "system-ui", "sans-serif"],
+        lora:        ["var(--font-lora)", "Georgia", "serif"],
+        garamond:    ["var(--font-garamond)", "Garamond", "serif"],
+        baskerville: ["var(--font-baskerville)", "Georgia", "serif"],
       },
       colors: {
         background: "hsl(var(--background))",

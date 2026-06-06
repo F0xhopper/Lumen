@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Article } from "@/lib/api";
 import { parseCrossRefs, type CrossRef } from "@/lib/cross-refs";
+import { useFontPrefs, type TextLanguage } from "@/components/FontPrefsProvider";
 
 const ORDINALS = "primum|secundum|tertium|quartum|quintum|sextum|septimum|octavum|nonum|decimum";
 
@@ -102,7 +105,7 @@ function SectionBlock({ id, text, className, dropcap, partAbbr, questionN }: {
 }) {
   return (
     <section id={id} className={cn("scroll-mt-6", dropcap && "article-dropcap", className)}>
-      <p className="font-cardo text-[14.5px] leading-[1.95] text-foreground/82 whitespace-pre-wrap">
+      <p className="reading-text text-foreground/82 whitespace-pre-wrap">
         {renderSection(text, partAbbr, questionN)}
       </p>
     </section>
@@ -117,6 +120,7 @@ function SectionPairRow({
   dropcap,
   partAbbr,
   questionN,
+  textLanguage,
 }: {
   en: string | null;
   la: string | null;
@@ -125,8 +129,21 @@ function SectionPairRow({
   dropcap?: boolean;
   partAbbr: string;
   questionN: number;
+  textLanguage: TextLanguage;
 }) {
   const extraClass = respondeoStyle ? "bg-foreground/[0.02] -mx-4 px-4 py-4 rounded" : undefined;
+  const showEn = textLanguage !== "la";
+  const showLa = textLanguage !== "en";
+
+  if (!showEn && !showLa) return null;
+
+  if (!showEn || !showLa) {
+    const text = showEn ? en : la;
+    const id   = showEn ? enId : undefined;
+    if (!text) return null;
+    return <SectionBlock id={id} text={text} className={extraClass} dropcap={dropcap} partAbbr={partAbbr} questionN={questionN} />;
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2">
       <div className="md:pr-8">
@@ -142,6 +159,9 @@ function SectionPairRow({
 }
 
 export function ArticleView({ article }: { article: Article }) {
+  const { prefs } = useFontPrefs();
+  const textLanguage = prefs.textLanguage;
+
   const maxObjs    = Math.max(article.objections.length,    article.objections_la.length);
   const maxReplies = Math.max(article.replies.length,       article.replies_la.length);
   const hasSC      = article.sed_contra    || article.sed_contra_la;
@@ -162,6 +182,7 @@ export function ArticleView({ article }: { article: Article }) {
               enId={en ? `objection-${en.n}` : undefined}
               partAbbr={part_abbr}
               questionN={question_n}
+              textLanguage={textLanguage}
             />
           );
         })}
@@ -176,6 +197,7 @@ export function ArticleView({ article }: { article: Article }) {
             enId="sed-contra"
             partAbbr={part_abbr}
             questionN={question_n}
+            textLanguage={textLanguage}
           />
         </>
       )}
@@ -191,6 +213,7 @@ export function ArticleView({ article }: { article: Article }) {
             dropcap
             partAbbr={part_abbr}
             questionN={question_n}
+            textLanguage={textLanguage}
           />
         </>
       )}
@@ -210,6 +233,7 @@ export function ArticleView({ article }: { article: Article }) {
                   enId={en ? `reply-${en.n}` : undefined}
                   partAbbr={part_abbr}
                   questionN={question_n}
+                  textLanguage={textLanguage}
                 />
               );
             })}

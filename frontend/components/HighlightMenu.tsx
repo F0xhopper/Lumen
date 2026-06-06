@@ -88,7 +88,7 @@ export function HighlightMenu({
   return (
     <div
       data-highlight-menu
-      onMouseDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.preventDefault()}
       className="fixed z-50 flex items-stretch bg-background border border-border/60 rounded shadow-md shadow-black/30 divide-x divide-border/40 overflow-hidden"
       style={{ left, top, width: W }}
     >

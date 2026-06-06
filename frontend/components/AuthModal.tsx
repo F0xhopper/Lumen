@@ -258,7 +258,7 @@ function Backdrop({ children, onClose }: { children: React.ReactNode; onClose: (
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm"
       onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-[300px] bg-background border border-border rounded-lg px-6 py-5 shadow-xl">
+      <div className="relative w-full max-w-[300px] mx-4 bg-background border border-border rounded-lg px-6 py-5 shadow-xl">
         <button
           onClick={onClose}
           className="absolute top-3 right-3 p-1 text-muted-foreground/35 hover:text-foreground/65 transition-colors"
