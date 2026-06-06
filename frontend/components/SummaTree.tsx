@@ -36,7 +36,7 @@ const ArticleRow = memo(({ n, title, isSelected, onClick, onPrefetch }: {
     onPointerEnter={onPrefetch}
     data-selected={isSelected ? "" : undefined}
     className={cn(
-      "w-full text-left px-2 py-1.5 rounded-sm transition-colors flex items-baseline gap-1.5",
+      "w-full text-left px-2 py-2 md:py-1.5 rounded-sm transition-colors flex items-baseline gap-1.5",
       isSelected
         ? "bg-foreground/[0.08] text-foreground"
         : "text-muted-foreground/55 hover:text-foreground/80 hover:bg-foreground/[0.04]"
@@ -69,7 +69,7 @@ const QuestionRow = memo(({
         onClick={onToggle}
         data-selected={isQSelected ? "" : undefined}
         className={cn(
-          "w-full flex items-start gap-1.5 px-2 py-[7px] rounded-sm text-left transition-colors group",
+          "w-full flex items-start gap-1.5 px-2 py-2.5 md:py-[7px] rounded-sm text-left transition-colors group",
           isQSelected
             ? "bg-foreground/[0.07] text-foreground"
             : "hover:bg-foreground/[0.04]"

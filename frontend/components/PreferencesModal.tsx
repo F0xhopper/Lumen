@@ -117,7 +117,7 @@ export default function PreferencesModal({ open, onClose }: Props) {
     >
       <div
         ref={panelRef}
-        className="relative w-[400px] max-h-[90vh] flex flex-col bg-background border border-border rounded-xl shadow-2xl"
+        className="relative w-full max-w-[400px] mx-4 max-h-[90vh] flex flex-col bg-background border border-border rounded-xl shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border shrink-0">

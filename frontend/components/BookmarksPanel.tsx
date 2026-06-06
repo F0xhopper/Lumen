@@ -289,7 +289,7 @@ export default function BookmarksPanel({
                             </button>
 
                             {/* Hover actions */}
-                            <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                            <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity">
                               <div className="relative">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === b.id ? null : b.id); }}
