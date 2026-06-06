@@ -50,6 +50,23 @@ export const metadata: Metadata = {
     "Study the Summa Theologica of St. Thomas Aquinas with AI-powered search and retrieval",
 };
 
+// Runs synchronously before first paint to apply stored font prefs without
+// a flash. Values must stay in sync with the maps in FontPrefsProvider.tsx.
+const FONT_INIT_SCRIPT = `(function(){try{
+  var p=JSON.parse(localStorage.getItem('lumen-font-prefs')||'{}');
+  var r=document.documentElement;
+  var ff={cardo:"var(--font-cardo),Georgia,serif",lora:"var(--font-lora),Georgia,serif",garamond:"var(--font-garamond),'EB Garamond',Garamond,serif",baskerville:"var(--font-baskerville),'Libre Baskerville',Georgia,serif",georgia:"Georgia,'Times New Roman',serif",inter:"var(--font-inter),system-ui,sans-serif"};
+  var fs={sm:'13.5px',md:'14.5px',lg:'16.5px',xl:'19px'};
+  var lh={compact:'1.70',normal:'1.95',relaxed:'2.25'};
+  var ls={tight:'-0.01em',normal:'0em',loose:'0.025em'};
+  var fw={regular:'400',medium:'500'};
+  if(ff[p.fontFamily])r.style.setProperty('--reading-font',ff[p.fontFamily]);
+  if(fs[p.fontSize])r.style.setProperty('--reading-size',fs[p.fontSize]);
+  if(lh[p.lineHeight])r.style.setProperty('--reading-leading',lh[p.lineHeight]);
+  if(ls[p.letterSpacing])r.style.setProperty('--reading-tracking',ls[p.letterSpacing]);
+  if(fw[p.fontWeight])r.style.setProperty('--reading-weight',fw[p.fontWeight]);
+}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: {
@@ -61,6 +78,10 @@ export default function RootLayout({
       className={`${inter.variable} ${cardo.variable} ${lora.variable} ${ebGaramond.variable} ${libreBaskerville.variable}`}
       suppressHydrationWarning
     >
+      {/* eslint-disable-next-line @next/next/no-head-element */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: FONT_INIT_SCRIPT }} />
+      </head>
       <body className={`${inter.className} antialiased`}>
         <QueryProvider>
           <AuthProvider>

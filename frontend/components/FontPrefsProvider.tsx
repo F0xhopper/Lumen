@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/AuthProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -138,27 +138,34 @@ const FontPrefsContext = createContext<FontPrefsContextValue>({
   setPrefs: () => {},
 });
 
-export function FontPrefsProvider({ children }: { children: React.ReactNode }) {
+const SAVE_DEBOUNCE_MS = 600;
+
+export function FontPrefsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [prefs, setPrefsState] = useState<FontPrefs>(DEFAULT_FONT_PREFS);
   const loadedForUserRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Mount: read localStorage immediately and apply CSS
+  // On mount: read localStorage and set state. The blocking inline script in
+  // layout.tsx already applied the CSS variables, so no flash occurs.
   useEffect(() => {
-    const stored = loadFromStorage();
-    setPrefsState(stored);
-    applyCSS(stored);
+    setPrefsState(loadFromStorage());
   }, []);
 
-  // Apply CSS whenever prefs state changes
+  // Keep CSS variables in sync whenever state changes (covers both localStorage
+  // load and server-fetched updates).
   useEffect(() => {
     applyCSS(prefs);
   }, [prefs]);
 
-  // When a user signs in (or identity changes), fetch server prefs — server wins
-  // so preferences sync across devices.
+  // When a user signs in fetch server prefs (server wins for cross-device sync).
+  // When user signs out reset the guard so the next sign-in always re-fetches.
   useEffect(() => {
-    if (!user || loadedForUserRef.current === user.id) return;
+    if (!user) {
+      loadedForUserRef.current = null;
+      return;
+    }
+    if (loadedForUserRef.current === user.id) return;
     loadedForUserRef.current = user.id;
 
     fetchPrefsFromBackend().then((serverPrefs) => {
@@ -173,7 +180,10 @@ export function FontPrefsProvider({ children }: { children: React.ReactNode }) {
     (newPrefs: FontPrefs) => {
       setPrefsState(newPrefs);
       saveToStorage(newPrefs);
-      if (user) savePrefsToBackend(newPrefs); // fire-and-forget
+      if (user) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => savePrefsToBackend(newPrefs), SAVE_DEBOUNCE_MS);
+      }
     },
     [user],
   );
