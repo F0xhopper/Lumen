@@ -9,6 +9,7 @@ FontSize = Literal["sm", "md", "lg", "xl"]
 LineHeight = Literal["compact", "normal", "relaxed"]
 LetterSpacing = Literal["tight", "normal", "loose"]
 FontWeight = Literal["regular", "medium"]
+TextLanguage = Literal["both", "en", "la"]
 
 
 class FontPrefsRequest(BaseModel):
@@ -17,6 +18,7 @@ class FontPrefsRequest(BaseModel):
     line_height: LineHeight
     letter_spacing: LetterSpacing
     font_weight: FontWeight
+    text_language: TextLanguage = "both"
 
 
 class FontPrefsResponse(BaseModel):
@@ -25,6 +27,7 @@ class FontPrefsResponse(BaseModel):
     line_height: LineHeight
     letter_spacing: LetterSpacing
     font_weight: FontWeight
+    text_language: TextLanguage
 
     @classmethod
     def from_domain(cls, p: FontPrefs) -> "FontPrefsResponse":
@@ -34,4 +37,5 @@ class FontPrefsResponse(BaseModel):
             line_height=p.line_height,
             letter_spacing=p.letter_spacing,
             font_weight=p.font_weight,
+            text_language=p.text_language,
         )

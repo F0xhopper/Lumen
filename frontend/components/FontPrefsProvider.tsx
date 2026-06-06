@@ -10,6 +10,7 @@ export type FontSize = "sm" | "md" | "lg" | "xl";
 export type LineHeight = "compact" | "normal" | "relaxed";
 export type LetterSpacing = "tight" | "normal" | "loose";
 export type FontWeight = "regular" | "medium";
+export type TextLanguage = "both" | "en" | "la";
 
 export interface FontPrefs {
   fontFamily: FontFamily;
@@ -17,6 +18,7 @@ export interface FontPrefs {
   lineHeight: LineHeight;
   letterSpacing: LetterSpacing;
   fontWeight: FontWeight;
+  textLanguage: TextLanguage;
 }
 
 export const DEFAULT_FONT_PREFS: FontPrefs = {
@@ -25,6 +27,7 @@ export const DEFAULT_FONT_PREFS: FontPrefs = {
   lineHeight: "normal",
   letterSpacing: "normal",
   fontWeight: "regular",
+  textLanguage: "both",
 };
 
 // ── CSS value maps (keep in sync with globals.css :root defaults) ──────────────
@@ -104,6 +107,7 @@ async function fetchPrefsFromBackend(): Promise<FontPrefs | null> {
       lineHeight:    (d.line_height    as LineHeight)    ?? DEFAULT_FONT_PREFS.lineHeight,
       letterSpacing: (d.letter_spacing as LetterSpacing) ?? DEFAULT_FONT_PREFS.letterSpacing,
       fontWeight:    (d.font_weight    as FontWeight)    ?? DEFAULT_FONT_PREFS.fontWeight,
+      textLanguage:  (d.text_language  as TextLanguage)  ?? DEFAULT_FONT_PREFS.textLanguage,
     };
   } catch {
     return null;
@@ -121,6 +125,7 @@ async function savePrefsToBackend(prefs: FontPrefs): Promise<void> {
         line_height:    prefs.lineHeight,
         letter_spacing: prefs.letterSpacing,
         font_weight:    prefs.fontWeight,
+        text_language:  prefs.textLanguage,
       }),
     });
   } catch { /* network errors are non-fatal */ }

@@ -17,6 +17,7 @@ import {
   type LineHeight,
   type LetterSpacing,
   type FontWeight,
+  type TextLanguage,
 } from "@/components/FontPrefsProvider";
 
 const PREVIEW_TEXT =
@@ -55,13 +56,20 @@ const FONT_WEIGHTS: { value: FontWeight; label: string }[] = [
   { value: "medium",  label: "Medium"  },
 ];
 
+const TEXT_LANGUAGES: { value: TextLanguage; label: string; desc: string }[] = [
+  { value: "both", label: "Both",    desc: "English · Latin" },
+  { value: "en",   label: "English", desc: "English only"    },
+  { value: "la",   label: "Latin",   desc: "Latin only"      },
+];
+
 function prefsEqual(a: FontPrefs, b: FontPrefs) {
   return (
     a.fontFamily    === b.fontFamily    &&
     a.fontSize      === b.fontSize      &&
     a.lineHeight    === b.lineHeight    &&
     a.letterSpacing === b.letterSpacing &&
-    a.fontWeight    === b.fontWeight
+    a.fontWeight    === b.fontWeight    &&
+    a.textLanguage  === b.textLanguage
   );
 }
 
@@ -289,6 +297,38 @@ export default function PreferencesModal({ open, onClose }: Props) {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+
+            {/* Language */}
+            <div>
+              <p className="font-inter text-[9px] tracking-[0.1em] uppercase text-muted-foreground/35 mb-2.5">Language</p>
+              <div className="grid grid-cols-3 gap-1">
+                {TEXT_LANGUAGES.map(({ value, label, desc }) => {
+                  const active = draft.textLanguage === value;
+                  return (
+                    <button
+                      key={value}
+                      aria-pressed={active}
+                      onClick={() => set("textLanguage", value)}
+                      className={cn(
+                        "flex flex-col items-center gap-0.5 py-2.5 rounded-md transition-colors",
+                        "hover:bg-foreground/[0.05]",
+                        active ? "bg-foreground/[0.08] ring-1 ring-foreground/15" : "",
+                      )}
+                    >
+                      <span className={cn(
+                        "font-inter text-[11px] leading-none",
+                        active ? "text-foreground/85" : "text-foreground/50",
+                      )}>
+                        {label}
+                      </span>
+                      <span className="font-inter text-[8px] leading-none text-muted-foreground/35">
+                        {desc}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

@@ -35,6 +35,7 @@ async def update_preferences(
         line_height=req.line_height,
         letter_spacing=req.letter_spacing,
         font_weight=req.font_weight,
+        text_language=req.text_language,
     )
     saved = await svc.upsert(user_id, prefs)
     return FontPrefsResponse.from_domain(saved)
