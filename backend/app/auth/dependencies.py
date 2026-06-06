@@ -2,14 +2,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.domain import AuthenticatedUser
-from app.auth.service import InvalidTokenError, JWTService, TokenExpiredError, get_jwt_service
+from app.auth.service import InvalidTokenError, SupabaseAuthService, TokenExpiredError, get_auth_service
 
 _bearer = HTTPBearer(auto_error=True)
 
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
-    svc: JWTService = Depends(get_jwt_service),
+    svc: SupabaseAuthService = Depends(get_auth_service),
 ) -> AuthenticatedUser:
     try:
         return svc.verify_token(credentials.credentials)

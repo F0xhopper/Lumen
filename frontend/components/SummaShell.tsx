@@ -27,6 +27,7 @@ import UserMenu from "@/components/UserMenu";
 import BookmarksPanel from "@/components/BookmarksPanel";
 import { useAuth } from "@/components/AuthProvider";
 import { SUMMA_PARTS, type SelectedNode, getAdjacentArticles } from "@/lib/summa-full";
+import { SUMMA_ARTICLE_TITLES } from "@/lib/summa-articles";
 import { SLUG_TO_PART_ID, nodeUrl } from "@/lib/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useKeybindings } from "@/hooks/useKeybindings";
@@ -412,6 +413,16 @@ export default function SummaShell() {
                   <ul className="py-1">
                     {history.map((h) => {
                       const slug = { "prima-pars": "1", "prima-secundae": "1-2", "secunda-secundae": "2-2", "tertia-pars": "3" }[h.part_id] ?? h.part_id;
+                      const part = SUMMA_PARTS.find((p) => p.id === h.part_id);
+                      const question = part?.treatises.flatMap((t) => t.questions).find((q) => q.n === h.question_n);
+                      const articleTitle = h.article_n
+                        ? SUMMA_ARTICLE_TITLES[h.part_id]?.[h.question_n]?.find((a) => a.n === h.article_n)?.title
+                        : undefined;
+                      const label = articleTitle
+                        ? `Q.${h.question_n} A.${h.article_n} — ${articleTitle}`
+                        : question
+                        ? `Q.${h.question_n} — ${question.title}`
+                        : `Q.${h.question_n}${h.article_n ? ` A.${h.article_n}` : ""}`;
                       return (
                         <li key={h.id}>
                           <button
@@ -420,8 +431,9 @@ export default function SummaShell() {
                               if (isMobile) setLeftOpen(false);
                             }}
                             className="w-full text-left px-3 py-2 font-cardo text-[12px] text-foreground/65 hover:text-foreground/90 leading-tight truncate transition-colors"
+                            title={label}
                           >
-                            Q.{h.question_n}{h.article_n ? ` A.${h.article_n}` : ""}
+                            {label}
                           </button>
                         </li>
                       );

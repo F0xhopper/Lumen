@@ -45,11 +45,17 @@ export function useHistory(user: User | null) {
         ].slice(0, 50),
       );
 
-      await recordVisit({
+      const saved = await recordVisit({
         part_id: node.partId,
         question_n: node.questionN,
         article_n: node.articleN ?? null,
       });
+
+      if (saved) {
+        setHistory((prev) =>
+          prev.map((h) => (h.id === entry.id ? saved : h)),
+        );
+      }
     },
     [user],
   );

@@ -127,6 +127,14 @@ export default function BookmarksPanel({
 }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [localFolders, setLocalFolders] = useState<string[]>([]);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (creatingFolder) newFolderInputRef.current?.focus();
+  }, [creatingFolder]);
 
   if (!isSignedIn) {
     return (
@@ -144,21 +152,12 @@ export default function BookmarksPanel({
     );
   }
 
-  if (bookmarks.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full p-6">
-        <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center leading-relaxed">
-          No bookmarks yet — use the bookmark icon in the header while reading
-        </p>
-      </div>
-    );
-  }
-
-  // Group by folder; null → "Uncategorized" rendered last
-  const folderNames = Array.from(
+  // Named folders: union of folders from saved bookmarks + locally created empty folders
+  const folderNamesFromBookmarks = Array.from(
     new Set(bookmarks.map((b) => b.folder).filter((f): f is string => f !== null)),
   ).sort();
-  const allFolders = [...folderNames, null] as (string | null)[];
+  const allNamedFolders = Array.from(new Set([...folderNamesFromBookmarks, ...localFolders])).sort();
+  const allFolders = [...allNamedFolders, null] as (string | null)[];
 
   const toggleCollapse = (key: string) =>
     setCollapsed((prev) => {
@@ -167,82 +166,166 @@ export default function BookmarksPanel({
       return next;
     });
 
+  const handleCreateFolder = () => {
+    const name = newFolderName.trim();
+    if (name && !allNamedFolders.includes(name)) {
+      setLocalFolders((prev) => [...prev, name]);
+    }
+    setNewFolderName("");
+    setCreatingFolder(false);
+  };
+
+  const handleDeleteFolder = (folder: string) => {
+    // Move all bookmarks in this folder to uncategorized
+    bookmarks.filter((b) => b.folder === folder).forEach((b) => onMoveToFolder(b.id, null));
+    // Remove from locally created folders
+    setLocalFolders((prev) => prev.filter((f) => f !== folder));
+  };
+
+  const hasContent = bookmarks.length > 0 || localFolders.length > 0;
+
   return (
-    <div className="flex-1 overflow-y-auto py-1">
-      {allFolders.map((folder) => {
-        const items = bookmarks.filter((b) => b.folder === folder);
-        if (items.length === 0) return null;
-        const key = folder ?? "__uncategorized__";
-        const isOpen = !collapsed.has(key);
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Toolbar */}
+      <div className="shrink-0 flex items-center justify-between px-2.5 py-1.5 border-b border-border">
+        <span className="font-inter text-[9px] tracking-widest uppercase text-muted-foreground/25">Saved</span>
+        <button
+          onClick={() => setCreatingFolder(true)}
+          title="New folder"
+          className="p-1 text-muted-foreground/30 hover:text-foreground/60 transition-colors"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
-        return (
-          <div key={key}>
-            {/* Folder header */}
-            <button
-              onClick={() => toggleCollapse(key)}
-              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 group hover:bg-foreground/[0.03] transition-colors"
-            >
-              {isOpen
-                ? <ChevronDown className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-                : <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-              }
-              {isOpen
-                ? <FolderOpen className="h-3.5 w-3.5 text-muted-foreground/35 shrink-0" />
-                : <Folder className="h-3.5 w-3.5 text-muted-foreground/35 shrink-0" />
-              }
-              <span className="flex-1 text-left font-inter text-[10px] tracking-wide text-muted-foreground/50 truncate">
-                {folder ?? "Uncategorized"}
-              </span>
-              <span className="font-inter text-[9px] text-muted-foreground/30">{items.length}</span>
-            </button>
-
-            {/* Bookmark rows */}
-            {isOpen && (
-              <ul>
-                {items.map((b) => (
-                  <li key={b.id} className="group/item relative flex items-center pl-7 pr-1.5">
-                    <button
-                      onClick={() => { onNavigate(bookmarkUrl(b)); }}
-                      className="flex-1 text-left py-1.5 font-cardo text-[12px] text-foreground/60 hover:text-foreground/90 leading-snug truncate transition-colors"
-                      title={bookmarkLabel(b)}
-                    >
-                      {bookmarkLabel(b)}
-                    </button>
-
-                    {/* Hover actions */}
-                    <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                      <div className="relative">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === b.id ? null : b.id); }}
-                          title="Move to folder"
-                          className="p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
-                        >
-                          <FolderPlus className="h-3 w-3" />
-                        </button>
-                        {pickerFor === b.id && (
-                          <FolderPicker
-                            currentFolder={b.folder}
-                            folders={folderNames}
-                            onAssign={(f) => { onMoveToFolder(b.id, f); setPickerFor(null); }}
-                            onClose={() => setPickerFor(null)}
-                          />
-                        )}
-                      </div>
-                      <button
-                        onClick={() => onRemove(b.id)}
-                        title="Remove bookmark"
-                        className="p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div className="flex-1 overflow-y-auto">
+        {/* Inline new-folder input */}
+        {creatingFolder && (
+          <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border/50">
+            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground/35 shrink-0" />
+            <input
+              ref={newFolderInputRef}
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); handleCreateFolder(); }
+                if (e.key === "Escape") { setNewFolderName(""); setCreatingFolder(false); }
+              }}
+              onBlur={handleCreateFolder}
+              placeholder="Folder name…"
+              className="flex-1 bg-transparent border-b border-foreground/20 font-inter text-[11px] text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:border-foreground/40 transition-colors pb-0.5"
+            />
           </div>
-        );
-      })}
+        )}
+
+        {/* Empty state */}
+        {!hasContent && !creatingFolder && (
+          <div className="flex items-center justify-center h-full p-6">
+            <p className="font-cardo italic text-[12px] text-muted-foreground/30 text-center leading-relaxed">
+              No bookmarks yet — use the bookmark icon in the header while reading
+            </p>
+          </div>
+        )}
+
+        {/* Folder list */}
+        <div className="py-1">
+          {allFolders.map((folder) => {
+            const items = bookmarks.filter((b) => b.folder === folder);
+            // Skip uncategorized section if empty; always show named folders (even if empty)
+            if (folder === null && items.length === 0) return null;
+
+            const key = folder ?? "__uncategorized__";
+            const isOpen = !collapsed.has(key);
+
+            return (
+              <div key={key}>
+                {/* Folder header */}
+                <div className="group/folder flex items-center px-2.5 py-1.5 hover:bg-foreground/[0.03] transition-colors">
+                  <button
+                    onClick={() => toggleCollapse(key)}
+                    className="flex-1 flex items-center gap-1.5 min-w-0"
+                  >
+                    {isOpen
+                      ? <ChevronDown className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+                    }
+                    {isOpen
+                      ? <FolderOpen className="h-3.5 w-3.5 text-muted-foreground/35 shrink-0" />
+                      : <Folder className="h-3.5 w-3.5 text-muted-foreground/35 shrink-0" />
+                    }
+                    <span className="flex-1 text-left font-inter text-[10px] tracking-wide text-muted-foreground/50 truncate">
+                      {folder ?? "Uncategorized"}
+                    </span>
+                    <span className="font-inter text-[9px] text-muted-foreground/30">{items.length || ""}</span>
+                  </button>
+                  {folder !== null && (
+                    <button
+                      onClick={() => handleDeleteFolder(folder)}
+                      title="Delete folder"
+                      className="shrink-0 ml-1 p-0.5 text-transparent group-hover/folder:text-muted-foreground/30 hover:!text-foreground/60 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Bookmark rows */}
+                {isOpen && (
+                  <>
+                    {items.length === 0 ? (
+                      <p className="pl-8 pb-1.5 font-cardo italic text-[11px] text-muted-foreground/25">
+                        Empty
+                      </p>
+                    ) : (
+                      <ul>
+                        {items.map((b) => (
+                          <li key={b.id} className="group/item relative flex items-center pl-7 pr-1.5">
+                            <button
+                              onClick={() => { onNavigate(bookmarkUrl(b)); }}
+                              className="flex-1 text-left py-1.5 font-cardo text-[12px] text-foreground/60 hover:text-foreground/90 leading-snug truncate transition-colors"
+                              title={bookmarkLabel(b)}
+                            >
+                              {bookmarkLabel(b)}
+                            </button>
+
+                            {/* Hover actions */}
+                            <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === b.id ? null : b.id); }}
+                                  title="Move to folder"
+                                  className="p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+                                >
+                                  <FolderPlus className="h-3 w-3" />
+                                </button>
+                                {pickerFor === b.id && (
+                                  <FolderPicker
+                                    currentFolder={b.folder}
+                                    folders={allNamedFolders}
+                                    onAssign={(f) => { onMoveToFolder(b.id, f); setPickerFor(null); }}
+                                    onClose={() => setPickerFor(null)}
+                                  />
+                                )}
+                              </div>
+                              <button
+                                onClick={() => onRemove(b.id)}
+                                title="Remove bookmark"
+                                className="p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

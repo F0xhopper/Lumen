@@ -1,4 +1,4 @@
-import jwt
+from supabase import Client, create_client
 
 from app.auth.domain import AuthenticatedUser
 from app.core.config import settings
@@ -12,35 +12,37 @@ class TokenExpiredError(InvalidTokenError):
     pass
 
 
-class JWTService:
-    """Stateless service — one instance is fine for the app lifetime."""
+class SupabaseAuthService:
+    def __init__(self, client: Client) -> None:
+        self._client = client
 
     def verify_token(self, token: str) -> AuthenticatedUser:
         try:
-            payload = jwt.decode(
-                token,
-                settings.SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-        except jwt.ExpiredSignatureError as exc:
-            raise TokenExpiredError("Token has expired") from exc
-        except jwt.InvalidTokenError as exc:
-            raise InvalidTokenError("Token is invalid") from exc
+            response = self._client.auth.get_user(token)
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "expired" in msg:
+                raise TokenExpiredError("Token has expired") from exc
+            raise InvalidTokenError(f"Token is invalid: {exc}") from exc
 
-        user_id: str | None = payload.get("sub")
-        if not user_id:
-            raise InvalidTokenError("Token is missing sub claim")
+        if response is None or response.user is None:
+            raise InvalidTokenError("Token is invalid: no user returned")
 
+        user = response.user
         return AuthenticatedUser(
-            user_id=user_id,
-            email=payload.get("email", ""),
-            role=payload.get("role", "authenticated"),
+            user_id=str(user.id),
+            email=user.email or "",
+            role=user.role or "authenticated",
         )
 
 
-_jwt_service = JWTService()
+def _make_service() -> SupabaseAuthService:
+    client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+    return SupabaseAuthService(client)
 
 
-def get_jwt_service() -> JWTService:
-    return _jwt_service
+_auth_service = _make_service()
+
+
+def get_auth_service() -> SupabaseAuthService:
+    return _auth_service

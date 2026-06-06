@@ -3,6 +3,8 @@ import asyncpg
 from app.history.domain import HistoryEntry
 
 _SCHEMA_SQL = """
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE IF NOT EXISTS history (
     id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id     TEXT        NOT NULL,
@@ -14,6 +16,9 @@ CREATE TABLE IF NOT EXISTS history (
 
 CREATE INDEX IF NOT EXISTS idx_history_user
     ON history(user_id, visited_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_history_unique
+    ON history(user_id, part_id, question_n, COALESCE(article_n, -1));
 """
 
 _MAX_ENTRIES = 50
@@ -48,7 +53,8 @@ class HistoryRepository:
                 ORDER BY visited_at DESC
                 LIMIT $2
                 """,
-                user_id, _MAX_ENTRIES,
+                user_id,
+                _MAX_ENTRIES,
             )
         return [_to_domain(r) for r in rows]
 
@@ -65,11 +71,15 @@ class HistoryRepository:
                 """
                 INSERT INTO history (user_id, part_id, question_n, article_n, visited_at)
                 VALUES ($1, $2, $3, $4, NOW())
+                ON CONFLICT (user_id, part_id, question_n, COALESCE(article_n, -1)) DO UPDATE
+                    SET visited_at = EXCLUDED.visited_at
                 RETURNING id, user_id, part_id, question_n, article_n, visited_at
                 """,
-                user_id, part_id, question_n, article_n,
+                user_id,
+                part_id,
+                question_n,
+                article_n,
             )
-            # Prune to keep only the most recent _MAX_ENTRIES rows per user
             await conn.execute(
                 """
                 DELETE FROM history
@@ -81,7 +91,8 @@ class HistoryRepository:
                       LIMIT $2
                   )
                 """,
-                user_id, _MAX_ENTRIES,
+                user_id,
+                _MAX_ENTRIES,
             )
         return _to_domain(row)
 
