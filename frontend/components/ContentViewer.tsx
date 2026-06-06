@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { ArticleView } from "./ArticleView";
 import { PassageList, QuestionJumpList, SearchLoadingSkeleton, ArticleLoadingSkeleton, EmptySearchState } from "./PassageList";
 import { HighlightMenu, type HighlightState } from "./HighlightMenu";
+import BookmarkButton from "./BookmarkButton";
 
 function ContentHeader({
   isSearchMode,
@@ -94,6 +95,14 @@ interface ContentViewerProps {
   onHighlightNote?: (text: string) => void;
   onHighlightSearch?: (text: string) => void;
   onHighlightAddToChat?: (text: string) => void;
+  isBookmarked?: boolean;
+  bookmarkId?: string | null;
+  bookmarkFolder?: string | null;
+  bookmarkFolders?: string[];
+  isSignedIn?: boolean;
+  onAddBookmark?: (node: SelectedNode, folder?: string | null) => void;
+  onRemoveBookmark?: (id: string) => void;
+  onSignIn?: () => void;
 }
 
 const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
@@ -107,6 +116,14 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
       onHighlightNote,
       onHighlightSearch,
       onHighlightAddToChat,
+      isBookmarked = false,
+      bookmarkId = null,
+      bookmarkFolder = null,
+      bookmarkFolders = [],
+      isSignedIn = false,
+      onAddBookmark,
+      onRemoveBookmark,
+      onSignIn,
     },
     ref
   ) {
@@ -295,6 +312,19 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
+              {selected && (
+                <BookmarkButton
+                  selected={selected}
+                  isBookmarked={isBookmarked}
+                  bookmarkId={bookmarkId}
+                  currentFolder={bookmarkFolder}
+                  folders={bookmarkFolders}
+                  isSignedIn={isSignedIn}
+                  onAdd={onAddBookmark ?? (() => {})}
+                  onRemove={onRemoveBookmark ?? (() => {})}
+                  onSignIn={onSignIn ?? (() => {})}
+                />
+              )}
             </div>
           )}
         </div>

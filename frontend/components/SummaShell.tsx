@@ -16,7 +16,6 @@ import {
   PenLine,
   MessageSquare,
   UserCircle,
-  BookmarkCheck,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
@@ -102,7 +101,7 @@ export default function SummaShell() {
   const inputRef = useRef<HTMLInputElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
-  const { bookmarks, add: addBookmark, remove: removeBookmark, moveToFolder, isBookmarked, bookmarkId } = useBookmarks(user);
+  const { bookmarks, add: addBookmark, remove: removeBookmark, moveToFolder, isBookmarked, bookmarkId, bookmarkFolder, folders: bookmarkFolders } = useBookmarks(user);
   const { history, record: recordVisit } = useHistory(user);
 
   useEffect(() => setMounted(true), []);
@@ -287,18 +286,6 @@ export default function SummaShell() {
         </form>
 
         <div className="shrink-0 flex items-center gap-0.5 ml-auto pr-2">
-          {selected && user && (
-            <button
-              onClick={() => isBookmarked(selected) ? removeBookmark(bookmarkId(selected)!) : addBookmark(selected)}
-              title={isBookmarked(selected) ? "Remove bookmark" : "Bookmark this article"}
-              className="p-2.5 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
-            >
-              {isBookmarked(selected)
-                ? <BookmarkCheck className="h-3.5 w-3.5 text-foreground/60" />
-                : <Bookmark className="h-3.5 w-3.5" />
-              }
-            </button>
-          )}
           {mounted && (
             user ? (
               <UserMenu
@@ -493,6 +480,14 @@ export default function SummaShell() {
                 chatPanelRef.current?.addQuote(text, selected);
                 if (!rightOpen) setRightOpen(true);
               }}
+              isBookmarked={selected ? isBookmarked(selected) : false}
+              bookmarkId={selected ? bookmarkId(selected) : null}
+              bookmarkFolder={selected ? bookmarkFolder(selected) : null}
+              bookmarkFolders={bookmarkFolders}
+              isSignedIn={!!user}
+              onAddBookmark={addBookmark}
+              onRemoveBookmark={removeBookmark}
+              onSignIn={() => setAuthOpen(true)}
             />
           </main>
         </div>
