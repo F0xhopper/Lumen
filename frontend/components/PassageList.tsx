@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Passage, QuestionMatch } from "@/lib/api";
 import { PART_ID_TO_SLUG } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
+import type { TextLanguage } from "@/components/FontPrefsProvider";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
   const tokens = query
@@ -84,47 +85,66 @@ const REPLY_LINES = [
   ["100%", "89%", "92%", "68%"],
 ];
 
-export function ArticleLoadingSkeleton() {
+function SkeletonCol({ lines, labelWidth, respondeo, delay }: { lines: string[]; labelWidth: string; respondeo?: boolean; delay: () => string }) {
+  const wrapper = respondeo ? "bg-foreground/[0.02] -mx-4 px-4 py-4 rounded space-y-[10px]" : "space-y-[10px]";
+  return (
+    <div className={wrapper}>
+      <div className="h-[9px] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ width: labelWidth, animationDelay: delay() }} />
+      {lines.map((w, j) => (
+        <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
+      ))}
+    </div>
+  );
+}
+
+export function ArticleLoadingSkeleton({ textLanguage = "en" }: { textLanguage?: TextLanguage }) {
   let tick = 0;
   const delay = () => `${(tick++) * 45}ms`;
+  const both = textLanguage === "both";
 
   return (
     <div>
       <div className="space-y-9">
         {OBJ_LINES.map((lines, i) => (
-          <div key={i} className="grid grid-cols-1 md:grid-cols-2">
-            <div className="md:pr-8 space-y-[10px]">
-              <div className="h-[9px] w-[38%] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ animationDelay: delay() }} />
-              {lines.map((w, j) => (
-                <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
-              ))}
+          <div key={i} className={cn("grid grid-cols-1", both && "md:grid-cols-2")}>
+            <div className="md:pr-8">
+              <SkeletonCol lines={lines} labelWidth="38%" delay={delay} />
             </div>
+            {both && (
+              <div className="md:border-l md:border-border/20 md:pl-8 mt-6 md:mt-0 border-t border-border/[0.12] pt-6 md:border-t-0 md:pt-0">
+                <SkeletonCol lines={lines} labelWidth="38%" delay={delay} />
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       <div className="h-px bg-foreground/[0.05] my-9" />
 
-      <div className="grid grid-cols-1 md:grid-cols-2">
-        <div className="md:pr-8 bg-foreground/[0.02] -mx-4 px-4 py-4 rounded space-y-[10px]">
-          <div className="h-[9px] w-[44%] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ animationDelay: delay() }} />
-          {RESPONDEO_LINES.map((w, j) => (
-            <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
-          ))}
+      <div className={cn("grid grid-cols-1", both && "md:grid-cols-2")}>
+        <div className="md:pr-8">
+          <SkeletonCol lines={RESPONDEO_LINES} labelWidth="44%" respondeo delay={delay} />
         </div>
+        {both && (
+          <div className="md:border-l md:border-border/20 md:pl-8 mt-6 md:mt-0 border-t border-border/[0.12] pt-6 md:border-t-0 md:pt-0">
+            <SkeletonCol lines={RESPONDEO_LINES} labelWidth="44%" respondeo delay={delay} />
+          </div>
+        )}
       </div>
 
       <div className="h-px bg-foreground/[0.05] my-9" />
 
       <div className="space-y-9">
         {REPLY_LINES.map((lines, i) => (
-          <div key={i} className="grid grid-cols-1 md:grid-cols-2">
-            <div className="md:pr-8 space-y-[10px]">
-              <div className="h-[9px] w-[42%] rounded-sm bg-foreground/[0.07] animate-pulse" style={{ animationDelay: delay() }} />
-              {lines.map((w, j) => (
-                <div key={j} className="h-[11px] rounded-sm bg-foreground/[0.045] animate-pulse" style={{ width: w, animationDelay: delay() }} />
-              ))}
+          <div key={i} className={cn("grid grid-cols-1", both && "md:grid-cols-2")}>
+            <div className="md:pr-8">
+              <SkeletonCol lines={lines} labelWidth="42%" delay={delay} />
             </div>
+            {both && (
+              <div className="md:border-l md:border-border/20 md:pl-8 mt-6 md:mt-0 border-t border-border/[0.12] pt-6 md:border-t-0 md:pt-0">
+                <SkeletonCol lines={lines} labelWidth="42%" delay={delay} />
+              </div>
+            )}
           </div>
         ))}
       </div>

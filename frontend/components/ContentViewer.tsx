@@ -14,6 +14,7 @@ import { ArticleView } from "./ArticleView";
 import { PassageList, QuestionJumpList, SearchLoadingSkeleton, ArticleLoadingSkeleton, EmptySearchState } from "./PassageList";
 import { HighlightMenu, type HighlightState } from "./HighlightMenu";
 import BookmarkButton from "./BookmarkButton";
+import { useFontPrefs } from "./FontPrefsProvider";
 
 function ContentHeader({
   isSearchMode,
@@ -131,6 +132,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
   const queryClient = useQueryClient();
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { prefs } = useFontPrefs();
 
   useImperativeHandle(ref, () => ({
     scrollBy: (delta) => scrollRef.current?.scrollBy({ top: delta, behavior: "smooth" }),
@@ -334,7 +336,7 @@ const ContentViewer = forwardRef<ContentViewerHandle, ContentViewerProps>(
         <div className={cn("mx-auto", isSearchMode || isQuestionMode ? "max-w-prose" : "w-full")}>
           {isLoading && isSearchMode && <SearchLoadingSkeleton />}
 
-          {isLoading && isArticleMode && <ArticleLoadingSkeleton />}
+          {isLoading && isArticleMode && <ArticleLoadingSkeleton textLanguage={prefs.textLanguage} />}
 
           {error ? (
             <div className="border border-border rounded p-4 space-y-2">
