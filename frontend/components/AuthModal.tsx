@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Github, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +42,7 @@ export default function AuthModal({ onClose }: Props) {
 
   const err = (msg: string) => { setErrorMsg(msg); setStatus("error"); };
 
-  const handleOAuth = async (provider: "google" | "github") => {
+  const handleOAuth = async (provider: "google") => {
     if (status === "loading") return;
     setStatus("loading");
     setErrorMsg("");
@@ -131,12 +131,6 @@ export default function AuthModal({ onClose }: Props) {
               disabled={status === "loading"}
               icon={<GoogleIcon />}
               label="Continue with Google"
-            />
-            <OAuthButton
-              onClick={() => handleOAuth("github")}
-              disabled={status === "loading"}
-              icon={<Github className="h-3.5 w-3.5" />}
-              label="Continue with GitHub"
             />
           </div>
           <div className="flex items-center gap-3 mb-1">

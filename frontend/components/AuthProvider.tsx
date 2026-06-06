@@ -9,7 +9,7 @@ interface AuthContextValue {
   loading: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithMagicLink: (email: string) => Promise<{ error: string | null }>;
-  signInWithOAuth: (provider: "google" | "github") => Promise<{ error: string | null }>;
+  signInWithOAuth: (provider: "google") => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null; needsVerification: boolean }>;
   signOut: () => Promise<void>;
 }
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null, needsVerification };
   }, []);
 
-  const signInWithOAuth = useCallback(async (provider: "google" | "github") => {
+  const signInWithOAuth = useCallback(async (provider: "google") => {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
