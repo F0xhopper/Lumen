@@ -128,7 +128,10 @@ export default function SummaShell() {
   }, [isMobile, leftOpen]);
 
   useEffect(() => {
-    if (isMobile) setLeftOpen(false);
+    if (isMobile) {
+      setLeftOpen(false);
+      setRightOpen(false);
+    }
   }, [isMobile]);
 
   useEffect(() => {
@@ -224,6 +227,12 @@ export default function SummaShell() {
           onClick={() => setLeftOpen(false)}
         />
       )}
+      {isMobile && rightOpen && (
+        <div
+          className="fixed top-12 inset-x-0 bottom-0 z-40 bg-background/75"
+          onClick={() => setRightOpen(false)}
+        />
+      )}
 
       <header className="relative shrink-0 flex items-center h-12 border-b border-border px-2 z-10 bg-background">
         {isMobile && (
@@ -294,15 +303,13 @@ export default function SummaShell() {
               </button>
             )
           )}
-          {!isMobile && (
-            <button
-              onClick={() => setRightOpen((o) => !o)}
-              title={rightOpen ? "Collapse AI chat (a)" : "Open AI chat (a)"}
-              className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <button
+            onClick={() => setRightOpen((o) => !o)}
+            title={rightOpen ? "Collapse AI chat (a)" : "Open AI chat (a)"}
+            className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
         </div>
       </header>
 
@@ -516,21 +523,27 @@ export default function SummaShell() {
           </div>
         )}
 
-        {!isMobile && (
-          <aside
-            className="shrink-0 flex flex-col overflow-hidden border-l border-border bg-background transition-[width] duration-200 ease-in-out"
-            style={{ width: rightOpen ? RIGHT_W : 0 }}
-          >
-            {rightOpen && (
-              <AIChatPanel
-                ref={chatPanelRef}
-                selected={selected}
-                onCollapse={() => setRightOpen(false)}
-                onNavigate={handleNavigate}
-              />
-            )}
-          </aside>
-        )}
+        <aside
+          className={cn(
+            "shrink-0 flex flex-col overflow-hidden border-l border-border bg-background",
+            isMobile
+              ? cn(
+                  "fixed top-12 bottom-0 right-0 z-50 transition-transform duration-200 ease-in-out",
+                  rightOpen ? "translate-x-0" : "translate-x-full",
+                )
+              : "transition-[width] duration-200 ease-in-out",
+          )}
+          style={{ width: isMobile ? "min(100vw, 390px)" : (rightOpen ? RIGHT_W : 0) }}
+        >
+          {(isMobile || rightOpen) && (
+            <AIChatPanel
+              ref={chatPanelRef}
+              selected={selected}
+              onCollapse={() => setRightOpen(false)}
+              onNavigate={(url) => { handleNavigate(url); if (isMobile) setRightOpen(false); }}
+            />
+          )}
+        </aside>
 
       </div>
 
