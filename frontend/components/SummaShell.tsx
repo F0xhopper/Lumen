@@ -16,7 +16,6 @@ import {
   UserCircle,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
@@ -308,7 +307,7 @@ export default function SummaShell() {
             title={rightOpen ? "Collapse AI chat (a)" : "Open AI chat (a)"}
             className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors"
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <MessageSquare className="h-3.5 w-3.5" />
           </button>
         </div>
       </header>

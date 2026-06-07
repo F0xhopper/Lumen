@@ -4,7 +4,7 @@ import {
   useState, useRef, useEffect, useCallback,
   forwardRef, useImperativeHandle,
 } from "react";
-import { Send, RotateCcw, PanelRightClose, Sparkles } from "lucide-react";
+import { Send, RotateCcw, PanelRightClose } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import {
   ContextArgChip,
@@ -205,10 +205,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         >
           <PanelRightClose className="h-3.5 w-3.5" />
         </button>
-        <div className="flex-1 flex items-center justify-center gap-1.5">
-          <Sparkles className="h-3 w-3 text-muted-foreground/30" />
-          <span className="font-inter text-[10px] tracking-widest uppercase text-muted-foreground/30">Ask Aquinas</span>
-        </div>
+        <div className="flex-1" />
         {messages.length > 0 ? (
           <button
             onClick={() => setMessages([])}
