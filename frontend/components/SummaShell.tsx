@@ -16,6 +16,7 @@ import {
   UserCircle,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import Image from "next/image";
 import SummaTree, { type SummaTreeHandle } from "@/components/SummaTree";
@@ -293,20 +294,15 @@ export default function SummaShell() {
               </button>
             )
           )}
-          {/* AI chat toggle — hidden while AI panel is disabled
           {!isMobile && (
             <button
               onClick={() => setRightOpen((o) => !o)}
               title={rightOpen ? "Collapse AI chat (a)" : "Open AI chat (a)"}
               className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors"
             >
-              {rightOpen
-                ? <MessageSquare className="h-3.5 w-3.5" />
-                : <PanelRightOpen className="h-3.5 w-3.5" />
-              }
+              <Sparkles className="h-3.5 w-3.5" />
             </button>
           )}
-          */}
         </div>
       </header>
 
@@ -459,18 +455,6 @@ export default function SummaShell() {
         )}
 
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-          {/* AI panel edge handle — hidden while AI panel is disabled
-          {!isMobile && rightOpen && (
-            <div
-              onClick={() => setRightOpen((o) => !o)}
-              title="Collapse AI panel"
-              className="absolute right-0 inset-y-0 w-4 z-20 cursor-pointer group/right-edge"
-            >
-              <div className="absolute right-0 inset-y-0 w-[2px] bg-border group-hover/right-edge:bg-foreground/30 transition-colors duration-150" />
-            </div>
-          )}
-          */}
-
           <main className="flex-1 flex flex-col overflow-hidden min-w-0">
             <ContentViewer
               ref={contentViewerRef}
@@ -508,7 +492,30 @@ export default function SummaShell() {
           </main>
         </div>
 
-        {/* AI chat panel — hidden while AI panel is disabled
+        {!isMobile && (
+          <div
+            onClick={() => setRightOpen((o) => !o)}
+            title={rightOpen ? "Collapse AI chat (a)" : "Expand AI chat (a)"}
+            className="absolute inset-y-0 w-4 z-30 cursor-pointer group/right-edge transition-[right] duration-200 ease-in-out"
+            style={{ right: rightOpen ? RIGHT_W : 0 }}
+          >
+            {rightOpen && (
+              <div className="absolute right-0 inset-y-0 w-[2px] bg-border group-hover/right-edge:bg-foreground/20 transition-colors duration-150" />
+            )}
+            <div
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-background border border-border text-muted-foreground/50 opacity-0 group-hover/right-edge:opacity-100 transition-all duration-200 shadow-sm hover:border-foreground/30 hover:text-foreground/70",
+                rightOpen ? "right-0 translate-x-1/2" : "right-1.5"
+              )}
+            >
+              {rightOpen
+                ? <ChevronRight className="h-3 w-3" />
+                : <ChevronLeft className="h-3 w-3" />
+              }
+            </div>
+          </div>
+        )}
+
         {!isMobile && (
           <aside
             className="shrink-0 flex flex-col overflow-hidden border-l border-border bg-background transition-[width] duration-200 ease-in-out"
@@ -524,7 +531,6 @@ export default function SummaShell() {
             )}
           </aside>
         )}
-        */}
 
       </div>
 

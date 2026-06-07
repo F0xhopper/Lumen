@@ -4,7 +4,7 @@ import {
   useState, useRef, useEffect, useCallback,
   forwardRef, useImperativeHandle,
 } from "react";
-import { Send, RotateCcw, PanelRightClose } from "lucide-react";
+import { Send, RotateCcw, PanelRightClose, Sparkles } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import {
   ContextArgChip,
@@ -197,7 +197,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* Header — mirrors the left sidebar tab bar height and padding */}
-      <div className="shrink-0 flex items-center px-2.5 py-2.5 border-b border-border gap-2">
+      <div className="shrink-0 flex items-center px-2.5 py-2.5 border-b border-border gap-2 min-h-[44px]">
         <button
           onClick={onCollapse}
           title="Collapse panel"
@@ -205,7 +205,10 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         >
           <PanelRightClose className="h-3.5 w-3.5" />
         </button>
-        <div className="flex-1" />
+        <div className="flex-1 flex items-center justify-center gap-1.5">
+          <Sparkles className="h-3 w-3 text-muted-foreground/30" />
+          <span className="font-inter text-[10px] tracking-widest uppercase text-muted-foreground/30">Ask Aquinas</span>
+        </div>
         {messages.length > 0 ? (
           <button
             onClick={() => setMessages([])}
