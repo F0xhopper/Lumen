@@ -36,10 +36,11 @@ interface Props {
   selected: SelectedNode | null;
   onCollapse: () => void;
   onNavigate?: (urlPath: string) => void;
+  isMobile?: boolean;
 }
 
 const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
-  { selected, onCollapse, onNavigate },
+  { selected, onCollapse, onNavigate, isMobile },
   ref,
 ) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -198,13 +199,15 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
 
       {/* Header — mirrors the left sidebar tab bar height and padding */}
       <div className="shrink-0 flex items-center px-2.5 py-2.5 border-b border-border gap-2 min-h-[44px]">
-        <button
-          onClick={onCollapse}
-          title="Collapse panel"
-          className="shrink-0 p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
-        >
-          <PanelRightClose className="h-3.5 w-3.5" />
-        </button>
+        {!isMobile && (
+          <button
+            onClick={onCollapse}
+            title="Collapse panel"
+            className="shrink-0 p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
+          >
+            <PanelRightClose className="h-3.5 w-3.5" />
+          </button>
+        )}
         <div className="flex-1" />
         {messages.length > 0 ? (
           <button

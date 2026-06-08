@@ -228,7 +228,7 @@ export default function SummaShell() {
       )}
       {isMobile && rightOpen && (
         <div
-          className="fixed top-12 inset-x-0 bottom-0 z-40 bg-background/75"
+          className="fixed top-12 inset-x-0 bottom-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={() => setRightOpen(false)}
         />
       )}
@@ -524,20 +524,30 @@ export default function SummaShell() {
 
         <aside
           className={cn(
-            "shrink-0 flex flex-col overflow-hidden border-l border-border bg-background",
+            "shrink-0 flex flex-col overflow-hidden bg-background",
             isMobile
               ? cn(
-                  "fixed top-12 bottom-0 right-0 z-50 transition-transform duration-200 ease-in-out",
-                  rightOpen ? "translate-x-0" : "translate-x-full",
+                  "fixed top-[104px] bottom-0 left-0 right-0 z-50 border-t border-border/60 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.7)] transition-transform duration-300 ease-in-out",
+                  rightOpen ? "translate-y-0" : "translate-y-full",
                 )
-              : "transition-[width] duration-200 ease-in-out",
+              : "border-l border-border transition-[width] duration-200 ease-in-out",
           )}
-          style={{ width: isMobile ? "min(100vw, 390px)" : (rightOpen ? RIGHT_W : 0) }}
+          style={isMobile ? undefined : { width: rightOpen ? RIGHT_W : 0 }}
         >
+          {isMobile && (
+            <button
+              onClick={() => setRightOpen(false)}
+              className="shrink-0 flex justify-center items-center py-3 w-full"
+              aria-label="Close chat"
+            >
+              <div className="w-12 h-[3px] rounded-full bg-foreground/25" />
+            </button>
+          )}
           {(isMobile || rightOpen) && (
             <AIChatPanel
               ref={chatPanelRef}
               selected={selected}
+              isMobile={isMobile}
               onCollapse={() => setRightOpen(false)}
               onNavigate={(url) => { handleNavigate(url); if (isMobile) setRightOpen(false); }}
             />
