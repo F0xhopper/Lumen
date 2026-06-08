@@ -4,7 +4,7 @@ import {
   useState, useRef, useEffect, useCallback,
   forwardRef, useImperativeHandle,
 } from "react";
-import { Send, RotateCcw, PanelRightClose } from "lucide-react";
+import { Send, RotateCcw, PanelRightClose, ArrowLeft } from "lucide-react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import {
   ContextArgChip,
@@ -197,16 +197,26 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* Header — mirrors the left sidebar tab bar height and padding */}
-      <div className="shrink-0 flex items-center px-2.5 py-2.5 border-b border-border gap-2 min-h-[44px]">
-        {!isMobile && (
-          <button
-            onClick={onCollapse}
-            title="Collapse panel"
-            className="shrink-0 p-1 text-muted-foreground/35 hover:text-foreground/70 transition-colors"
-          >
-            <PanelRightClose className="h-3.5 w-3.5" />
-          </button>
+      <div className="shrink-0 flex items-center px-2.5 border-b border-border gap-2 min-h-[44px]">
+        <button
+          onClick={onCollapse}
+          title={isMobile ? "Back" : "Collapse panel"}
+          className={cn(
+            "shrink-0 p-1 transition-colors",
+            isMobile
+              ? "text-muted-foreground/60 hover:text-foreground/80 -ml-0.5"
+              : "text-muted-foreground/35 hover:text-foreground/70",
+          )}
+        >
+          {isMobile
+            ? <ArrowLeft className="h-5 w-5" />
+            : <PanelRightClose className="h-3.5 w-3.5" />
+          }
+        </button>
+        {isMobile && (
+          <span className="font-cardo italic text-[17px] text-foreground/75 leading-none">
+            Ask Aquinas
+          </span>
         )}
         <div className="flex-1" />
         {messages.length > 0 ? (
