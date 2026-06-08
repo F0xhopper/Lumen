@@ -315,7 +315,7 @@ export default function SummaShell() {
                   "border-r border-border fixed top-12 bottom-0 left-0 z-50 transition-transform duration-200 ease-in-out",
                   leftOpen ? "translate-x-0" : "-translate-x-full",
                 )
-              : "transition-[width] duration-200 ease-in-out",
+              : "border-r border-border transition-[width] duration-200 ease-in-out",
           )}
           style={{ width: isMobile ? LEFT_W : (leftOpen ? LEFT_W : 0) }}
         >
