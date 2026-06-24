@@ -46,7 +46,7 @@ const libreBaskerville = Libre_Baskerville({
 export const metadata: Metadata = {
   title: "Lumen",
   description:
-    "Study the Summa Theologica of St. Thomas Aquinas with AI-powered search and retrieval",
+    "Study the Summa Theologica of St. Thomas Aquinas",
 };
 
 // Runs synchronously before first paint to apply stored font prefs without

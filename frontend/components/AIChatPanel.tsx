@@ -215,7 +215,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
         </button>
         {isMobile && (
           <span className="font-cardo italic text-[17px] text-foreground/75 leading-none">
-            Ask Aquinas
+            Chat
           </span>
         )}
         <div className="flex-1" />
@@ -239,16 +239,13 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
             <p className="font-cardo italic text-[13px] text-muted-foreground/30 leading-relaxed">
               {selected
                 ? `Ask anything about ${selected.partAbbr} Q.${selected.questionN}`
-                : "Select a question to begin"}
-            </p>
-            <p className="font-inter text-[9px] tracking-[0.08em] uppercase text-muted-foreground/25 mt-2">
-              Highlight text to quote it in chat
+                : "Ask anything about the Summa"}
             </p>
             {selected && (
               <div className="mt-5 space-y-1">
                 {[
-                  `What is the central argument of Q.${selected.questionN}?`,
-                  `What objections does Aquinas consider?`,
+                  `What's the main point Aquinas is making here?`,
+                  `What are the objections and how does he answer them?`,
                   `How does this connect to the rest of the Summa?`,
                 ].map((suggestion) => (
                   <button
@@ -312,14 +309,6 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
                   </div>
                 )}
 
-                {msg.passagesUsed !== undefined && (
-                  <p className="font-inter text-[9px] text-muted-foreground/30">
-                    {msg.passagesUsed} passage{msg.passagesUsed !== 1 ? "s" : ""} retrieved
-                    {msg.agentSteps !== undefined && msg.agentSteps > 1
-                      ? ` · ${msg.agentSteps} search rounds`
-                      : ""}
-                  </p>
-                )}
               </div>
             )}
           </div>
@@ -363,7 +352,7 @@ const AIChatPanel = forwardRef<AIChatPanelHandle, Props>(function AIChatPanel(
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleTextareaKeyDown}
-            placeholder="Ask about the Summa…"
+            placeholder="Ask anything…"
             rows={2}
             className={cn(
               "w-full resize-none pl-3 pr-8 py-2 bg-secondary border border-border rounded",

@@ -25,7 +25,7 @@ const SECTIONS: { label: string; bindings: Binding[] }[] = [
     bindings: [
       { key: "/", description: "Search the Summa" },
       { key: "f", description: "Filter tree" },
-      { key: "a", description: "Ask AI" },
+      { key: "a", description: "Open chat" },
       { key: "Esc", description: "Blur / dismiss" },
     ],
   },
@@ -33,7 +33,7 @@ const SECTIONS: { label: string; bindings: Binding[] }[] = [
     label: "Panels",
     bindings: [
       { key: "b", description: "Toggle sidebar" },
-      { key: "c", description: "Toggle AI chat" },
+      { key: "c", description: "Toggle chat" },
       { key: "t", description: "Toggle theme" },
       { key: "?", description: "Show this help" },
     ],

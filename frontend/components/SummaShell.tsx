@@ -298,7 +298,7 @@ export default function SummaShell() {
           )}
           <button
             onClick={() => setRightOpen((o) => !o)}
-            title={rightOpen ? "Collapse AI chat (a)" : "Open AI chat (a)"}
+            title={rightOpen ? "Collapse chat (a)" : "Open chat (a)"}
             className="p-2.5 text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors"
           >
             <MessageSquare className="h-3.5 w-3.5" />
@@ -495,7 +495,7 @@ export default function SummaShell() {
         {!isMobile && (
           <div
             onClick={() => setRightOpen((o) => !o)}
-            title={rightOpen ? "Collapse AI chat (a)" : "Expand AI chat (a)"}
+            title={rightOpen ? "Collapse chat (a)" : "Expand chat (a)"}
             className="absolute inset-y-0 w-4 z-30 cursor-pointer group/right-edge transition-[right] duration-200 ease-in-out"
             style={{ right: rightOpen ? RIGHT_W : 0 }}
           >
