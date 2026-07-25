@@ -2,17 +2,17 @@
 
 [![CI](https://github.com/F0xhopper/Lumen/actions/workflows/ci.yml/badge.svg)](https://github.com/F0xhopper/Lumen/actions/workflows/ci.yml)
 
-A study companion for the Summa Theologica. Full text in parallel English and Latin, hybrid semantic search, and an AI assistant grounded in the text — with bookmarks, notes and reading history.
+A study companion for the Summa Theologica. Full text in parallel English and Latin, hybrid semantic search, and an AI assistant grounded in the text, plus bookmarks, notes and reading history.
 
-![Article view — parallel English/Latin text](docs/screenshot-article.jpg)
+![Article view with parallel English/Latin text](docs/screenshot-article.jpg)
 
 ## Features
 
-- **Full text** — all four parts and 512 questions, browsable by treatise, question and article, with a parallel English/Latin reading view. Article text is served as static JSON, so reading works without the backend.
-- **Hybrid search** — dense embeddings (`text-embedding-3-large`) plus sparse BM25 in Pinecone, fused with Postgres full-text search via reciprocal rank fusion. HyDE query expansion and cross-encoder reranking (Pinecone-hosted, with a local fallback).
-- **AI assistant** — a tool-calling agent that searches the Summa up to three times per question, answers with inline citations, streams its response, and knows which passage you are reading.
-- **Study tools** — bookmarks with folders, per-article notes, reading history, font preferences and keyboard-driven navigation.
-- **Accounts** — sign-in via Supabase (password, magic link or Google); bookmarks, history and preferences sync per user.
+- **Full text:** all four parts and 512 questions, browsable by treatise, question and article, with a parallel English/Latin reading view. Article text is served as static JSON, so reading works without the backend.
+- **Hybrid search:** dense embeddings (`text-embedding-3-large`) plus sparse BM25 in Pinecone, fused with Postgres full-text search via reciprocal rank fusion. HyDE query expansion and cross-encoder reranking (Pinecone-hosted, with a local fallback).
+- **AI assistant:** a tool-calling agent that searches the Summa up to three times per question, answers with inline citations, streams its response, and knows which passage you are reading.
+- **Study tools:** bookmarks with folders, per-article notes, reading history, font preferences and keyboard-driven navigation.
+- **Accounts:** sign-in via Supabase (password, magic link or Google); bookmarks, history and preferences sync per user.
 
 ## Stack
 
@@ -35,7 +35,7 @@ npm install
 npm run dev   # http://localhost:3000
 ```
 
-Browsing the full text works immediately — no backend or keys required. Search and the AI assistant need the API below.
+Browsing the full text works immediately; no backend or keys required. Search and the AI assistant need the API below.
 
 ### Backend
 
