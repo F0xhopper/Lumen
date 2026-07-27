@@ -4,7 +4,7 @@
 
 A study companion for the Summa Theologica. Full text in parallel English and Latin, hybrid semantic search, and an AI assistant grounded in the text, plus bookmarks, notes and reading history.
 
-![Uploading Screenshot_2026-06-09_at_21.54.24.webp…]()
+<img width="1563" height="1059" alt="Screenshot_2026-06-09_at_21 54 24 (1)" src="https://github.com/user-attachments/assets/504eaf08-c614-4b4a-8121-88133ff94391" />
 
 ## Features
 
